@@ -1,0 +1,3126 @@
+---
+title: "2b-simulation_study_data_simulation"
+author: "J Lacasa"
+date: "8/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Simulations  
+
+The denomination of the simulated dataframes starts with `sim` and is followed by the id:  
+
+```{r table}
+table_descript <- data.frame(
+  ID = 1:9,
+  "Samplings NOT reaching Wmax (%)" = rep(c(0, 33, 66), each = 3),
+  `Samplings` = rep(c(4, 8, 16), 3)
+)
+knitr::kable(table_descript[], 
+             caption = "**Table 1.** Experimental design & characteristics of the simualtions",
+             col.names = c("ID", "% of samplings NOT reaching plateau", 
+                           "Samplings"),
+             align = 'l')
+```
+
+### Set the simulation conditions   
+```{r set simulations}
+n1 <- 4
+n2 <- 8
+n3 <- 16
+
+A1.true = 3.8 #3.5
+A2.true = .44 #.35
+```
+
+### Bootstrapped simulations
+
+```{r bootstrap pre-data}
+set.seed(57)
+N_sims <- 2000
+
+# Create 1 set without combinations where N starts too close to Nc - that make it too hard to identify the L-P 
+ss1_1 <- as.matrix(do(N_sims)*sample(1:(length(Bmax_v)- length(remove1)), n1, replace = FALSE))
+ss2_1 <- as.matrix(do(N_sims)*sample(1:(length(Bmax_v)- length(remove1)), n2, replace = FALSE))
+ss3_1 <- as.matrix(do(N_sims)*sample(1:(length(Bmax_v)- length(remove1)), n3, replace = FALSE))
+
+#Create sert that do include combinations where N starts too close to Nc - that make it too hard to identify the L-P 
+ss1 <- as.matrix(do(N_sims)*sample(1:length(Bmax_v), n1, replace = FALSE))
+ss2 <- as.matrix(do(N_sims)*sample(1:length(Bmax_v), n2, replace = FALSE))
+ss3 <- as.matrix(do(N_sims)*sample(1:length(Bmax_v), n3, replace = FALSE))
+```
+
+Filter only realistic combinations
+```{r}
+which.to.keep1 <- character(N_sims)
+which.to.keep2 <- character(N_sims)
+which.to.keep3 <- character(N_sims)
+which.to.keep1_1 <- character(N_sims)
+which.to.keep2_1 <- character(N_sims)
+which.to.keep3_1 <- character(N_sims)
+
+for (i in 1:N_sims) {
+ which.to.keep1[i] <- ifelse(sum(diff(sort(Bmax_v[ss1[i,]])) <2.5) >= n1/2, "remove", "keep" )
+ which.to.keep2[i] <- ifelse(sum(diff(sort(Bmax_v[ss2[i,]])) <1) >= n2/2, "remove", "keep" )
+ which.to.keep3[i] <- ifelse(sum(diff(sort(Bmax_v[ss3[i,]])) <0.5) >= n3/2, "remove", "keep" )
+ which.to.keep1_1[i] <- ifelse(sum(diff(sort((Bmax_v[-remove1])[ss1_1[i,]])) <2.5) >= n1/2, "remove", "keep" )
+ which.to.keep2_1[i] <- ifelse(sum(diff(sort((Bmax_v[-remove1])[ss2_1[i,]])) <1) >= n2/2, "remove", "keep" )
+ which.to.keep3_1[i] <- ifelse(sum(diff(sort((Bmax_v[-remove1])[ss3_1[i,]])) <0.5) >= n3/2, "remove", "keep" )
+}
+
+length(which(which.to.keep1=="keep"))
+length(which(which.to.keep1_1=="keep"))
+length(which(which.to.keep2=="keep"))
+length(which(which.to.keep3=="keep"))
+
+ss1_1 <- (ss1_1[which(which.to.keep1_1=="keep"),])[1:1000,]
+ss2_1 <- (ss2_1[which(which.to.keep2_1=="keep"),])[1:1000,]
+ss3_1 <- (ss3_1[which(which.to.keep3_1=="keep"),])[1:1000,]
+ss1 <- (ss1[which(which.to.keep1=="keep"),])[1:1000,]
+ss2 <- (ss2[which(which.to.keep2=="keep"),])[1:1000,]
+ss3 <- (ss3[which(which.to.keep3=="keep"),])[1:1000,]
+```
+
+### Simulate dilutions  
+```{r sim dilutions}
+N_sims <- 1000
+set.seed(42)
+## 1. n1 obs, 0% missing plateaus
+sim1 <- list()
+
+for (i in 1:N_sims) {
+  sim1[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                        N_nrates = 5, N_reps = 3,
+                        Bmax_v = (Bmax_v[-remove1])[ss1_1[i,]],
+                        s_v = (s_v[-remove1])[ss1_1[i,]],
+                        Nstart_v = (Nstart_v[-remove1])[ss1_1[i,]],
+                        sy_v = factor(1:n1),
+                        var = FALSE,
+                        Nact_ul = .45)
+}
+
+## 1. n2 obs, 0% missing plateaus
+
+sim2 <- list()
+for (i in 1:N_sims) {
+  sim2[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = (Bmax_v[-remove1])[ss2_1[i,]],
+                 s_v = (s_v[-remove1])[ss2_1[i,]], 
+                 Nstart_v = (Nstart_v[-remove1])[ss2_1[i,]], 
+                 sy_v = factor(1:n2),
+                 var = FALSE,
+                 Nact_ul = 0.35)
+  }
+
+
+
+## 3. n3 obs, 0% missing plateaus
+sim3 <- list()
+for (i in 1:N_sims) {
+  sim3[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = (Bmax_v[-remove1])[ss3_1[i,]],
+                 s_v = (s_v[-remove1])[ss3_1[i,]], 
+                 Nstart_v = (Nstart_v[-remove1])[ss3_1[i,]], 
+                 sy_v = factor(1:n3),
+                 var = FALSE,
+                 Nact_ul = 0.35)
+  }
+
+
+
+## 4. n1 obs, 33% missing plateaus (.25)
+sim4 <- list()
+for(i in 1:N_sims){
+sim4[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = Bmax_v[ss1[i,]],
+                 s_v = s_v[ss1[i,]], 
+                 Nstart_v = Nstart_v[ss1[i,]], 
+                 sy_v = factor(1:n1),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 5. n2 obs, 33% missing plateaus (.25)
+sim5 <- list()
+for(i in 1:N_sims){
+sim5[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = Bmax_v[ss2[i,]],
+                 s_v = s_v[ss2[i,]], 
+                 Nstart_v = Nstart_v[ss2[i,]], 
+                 sy_v = factor(1:n2),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 6. n3 obs, 33% missing plateaus
+sim6 <- list()
+for(i in 1:N_sims){
+sim6[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = Bmax_v[ss3[i,]],
+                 s_v = s_v[ss3[i,]], 
+                 Nstart_v = Nstart_v[ss3[i,]], 
+                 sy_v = factor(1:n3),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 7. n1 obs, 66% missing plateaus
+sim7 <- list()
+for(i in 1:N_sims) {
+sim7[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = Bmax_v[ss1[i,]],
+                 s_v = s_v[ss1[i,]], 
+                 Nstart_v = Nstart_v[ss1[i,]], 
+                 sy_v = factor(1:n1),
+                 var = TRUE,
+                 Nact_ul = .0965)
+}
+
+## 5. n2 obs, 33% missing plateaus (.25)
+sim8 <- list()
+for(i in 1:N_sims) {
+sim8[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = Bmax_v[ss2[i,]],
+                 s_v = s_v[ss2[i,]], 
+                 Nstart_v = Nstart_v[ss2[i,]], 
+                 sy_v = factor(1:n2),
+                 var = TRUE,
+                 Nact_ul = .09)
+}
+
+## 9. n3 obs, 66% missing plateaus (.25)
+sim9 <- list()
+
+for(i in 1:N_sims) {
+sim9[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = 5, N_reps = 3,
+                 Bmax_v = Bmax_v[ss3[i,]],
+                 s_v = s_v[ss3[i,]], 
+                 Nstart_v = Nstart_v[ss3[i,]], 
+                 sy_v = factor(1:n3),
+                 var = TRUE,
+                 Nact_ul = .09)
+}
+```
+
+```{r plot to see, eval=FALSE, include=FALSE}
+lapply(sim9_filtered[4:8],
+       function(x) {x %>% 
+  ggplot(aes(W, Nact))+
+  geom_segment(aes(y = Nstart, yend = Nc, x = Wstart, xend = Wend, group = sampling),
+               linetype = 2, alpha = .7, color = "grey35")+
+  geom_segment(aes(y = Nc, yend = Nc+.6, x = Wend, xend = Wend), linetype = 2, alpha = .7, color = "grey35")+
+  geom_point(aes(color = sy), show.legend = F)+
+  geom_line(aes(x = Wmax, y = Nc))+
+           theme(aspect.ratio = .8)+
+  stat_function(fun = function(x){A1.true*x^(-A2.true)}, 
+                linetype = 2,
+                color = "tomato")        
+})#[[5]]
+
+# ggsave("output/figures/curve_pp.tiff", width = 4, height = 4)
+```
+
+
+### Fit Linear-plateau  
+
+```{r fake N_sims, eval=TRUE, include=FALSE}
+N_sims <- 500
+```
+
+```{r map linear-plateau, message = FALSE, warning=FALSE, eval=FALSE}
+a <- list()
+for (i in 1:N_sims){
+  a[[i]] <- lapply(list(sim1[[i]], sim2[[i]], sim3[[i]], sim4[[i]], sim5[[i]], sim6[[i]], sim7[[i]], sim8[[i]], sim9[[i]]),
+                   map_lp)
+}
+```
+
+```{r}
+# a %>% saveRDS("a_500_05162022.rds")
+a %>% saveRDS("a_5n_500_007082022.rds")
+```
+
+```{r secret read a, eval=TRUE, include=FALSE}
+# a <- readRDS("a_500_05022022.rds")
+# a <- readRDS("a_500_05162022.rds")
+```
+
+```{r plateaus yes-no}
+plateaus <- list()
+
+for (i in 1:N_sims){
+  plateaus[[i]] <- lapply(a[[1]],
+                   function(x) {spot_nulls(x) %>% as.numeric() })
+}
+```
+
+
+#### Check that the nr of missing plateaus is approx correct  
+
+```{r check missing perc}
+missing <- data.frame(
+  sim1 = numeric(N_sims),
+  sim2 = numeric(N_sims),
+  sim3 = numeric(N_sims),
+  sim4 = numeric(N_sims),
+  sim5 = numeric(N_sims),
+  sim6 = numeric(N_sims),
+  sim7 = numeric(N_sims),
+  sim8 = numeric(N_sims),
+  sim9 = numeric(N_sims))
+
+for (i in 1:N_sims) {
+  tryCatch({
+    missing[i, 1] <- mean(plateaus[[i]][[1]])
+    missing[i, 2] <- mean(plateaus[[i]][[2]])
+    missing[i, 3] <- mean(plateaus[[i]][[3]])
+    missing[i, 4] <- mean(plateaus[[i]][[4]])
+    missing[i, 5] <- mean(plateaus[[i]][[5]])
+    missing[i, 6] <- mean(plateaus[[i]][[6]])
+    missing[i, 7] <- mean(plateaus[[i]][[7]])
+    missing[i, 8] <- mean(plateaus[[i]][[8]])
+    missing[i, 9] <- mean(plateaus[[i]][[9]])},
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+  if(skip_to_next) { next }
+}
+
+missing %>% summarise_at(vars(sim1:sim9), funs(mean))
+```
+
+### Final dataframe   
+
+```{r final_df, message=FALSE, warning=FALSE, eval=FALSE, include=TRUE}
+final_df <- list()
+for (i in 1:N_sims){
+final_df[[i]] <-  sim1[[i]] %>% 
+  left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[1]]) %>%
+              mutate(sy = id %>% as.factor(),
+                     sim_id = 1,
+                     nl_nc = get_nc_fromlist(a[[i]][[1]]),
+                     nl_wmax = get_wmax_fromlist(a[[i]][[1]]))) %>% 
+  left_join(compare_aic(dataframe = sim1[[i]], nl_list = a[[i]][[1]]) %>% dplyr::select(sy, recomm)) %>% 
+  bind_rows(sim2[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[2]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 2,
+                                        nl_nc = get_nc_fromlist(a[[i]][[2]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[2]]))) %>% 
+              left_join(compare_aic(dataframe = sim2[[i]], nl_list = a[[i]][[2]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim3[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[3]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 3,
+                                        nl_nc = get_nc_fromlist(a[[i]][[3]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[3]]))) %>% 
+              left_join(compare_aic(dataframe = sim3[[i]], nl_list = a[[i]][[3]]) %>% dplyr::select(sy, recomm))) %>%
+  bind_rows(sim4[[i]] %>% left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[4]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 4,
+                                        nl_nc = get_nc_fromlist(a[[i]][[4]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[4]]))) %>% 
+              left_join(compare_aic(dataframe = sim4[[i]], nl_list = a[[i]][[4]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim5[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[5]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 5,
+                                        nl_nc = get_nc_fromlist(a[[i]][[5]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[5]]))) %>% 
+              left_join(compare_aic(dataframe = sim5[[i]], nl_list = a[[i]][[5]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim6[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[6]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 6,
+                                        nl_nc = get_nc_fromlist(a[[i]][[6]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[6]]))) %>% 
+              left_join(compare_aic(dataframe = sim6[[i]], nl_list = a[[i]][[6]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim7[[i]] %>% left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[7]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 7,
+                                        nl_nc = get_nc_fromlist(a[[i]][[7]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[7]]))) %>% 
+              left_join(compare_aic(dataframe = sim7[[i]], nl_list = a[[i]][[7]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim8[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[8]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 8,
+                                        nl_nc = get_nc_fromlist(a[[i]][[8]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[8]]))) %>% 
+              left_join(compare_aic(dataframe = sim8[[i]], nl_list = a[[i]][[8]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim9[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[9]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 9,
+                                        nl_nc = get_nc_fromlist(a[[i]][[9]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[9]]))) %>% 
+              left_join(compare_aic(dataframe = sim9[[i]], nl_list = a[[i]][[9]]) %>% dplyr::select(sy, recomm))) %>% 
+  mutate(sampling = as.factor(sampling), 
+         nl_nc = ifelse(nl_nc == 0 , NA, nl_nc),
+         nl_wmax = ifelse(nl_wmax == 0 , NA, nl_wmax))
+}
+```
+
+```{r}
+# final_df %>% saveRDS("final_df_0516.rds")
+final_df %>% saveRDS("final_df_5n_07082022.rds")
+```
+
+```{r secret read df, eval=TRUE, include=FALSE}
+# final_df  <- readRDS("final_df_0516.rds")
+```
+
+#### Clean final DF  
+
+```{r clean df}
+final_df_clean <- lapply(final_df, function(x) {
+  x %>% filter(recomm == "nl")
+})
+```
+
+Check the amount of missing plateaus  
+
+
+```{r recomm loop}
+recomm_nl <- lapply(final_df_clean, function(x) {
+  lapply(split(x, x$sim_id),
+         function(x) {
+           n_distinct(x$sampling)
+           })
+  }) %>% bind_rows()
+
+recomm_nl %>% colMeans(na.rm = T) %>% as.data.frame() %>% 
+  rownames_to_column("sim_id") %>% 
+  pivot_wider(names_from = "sim_id", values_from = ".") %>% 
+  transmute(recomm_nl1 = 1-(`1`/4),
+            recomm_nl2 = 1-(`2`/8),
+            recomm_nl3 = 1-(`3`/16),
+            recomm_nl4 = 1-(`4`/4),
+            recomm_nl5 = 1-(`5`/8),
+            recomm_nl6 = 1-(`6`/16),
+            recomm_nl7 = 1-(`7`/4),
+            recomm_nl8 = 1-(`8`/8),
+            recomm_nl9 = 1-(`9`/16))
+```
+
+Divide into sim*_filtered (each list includes all the filtered dataframes from sim1, sim2, ... sim9)  
+
+```{r filter sims}
+#create objects to store the data
+sim1_filtered <- list()
+sim2_filtered <- list()
+sim3_filtered <- list()
+sim4_filtered <- list()
+sim5_filtered <- list()
+sim6_filtered <- list()
+sim7_filtered <- list()
+sim8_filtered <- list()
+sim9_filtered <- list()
+
+for (i in 1:N_sims) {
+  sim1_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 1 )
+  sim2_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 2 )
+  sim3_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 3 )
+  sim4_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 4 )
+  sim5_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 5 )
+  sim6_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 6 )
+  sim7_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 7 )
+  sim8_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 8 )
+  sim9_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 9 )
+
+}
+```
+
+
+```{r histogram}
+masterlist_filt <- list(sim1_filtered, sim2_filtered, sim3_filtered, sim4_filtered, 
+                        sim5_filtered, sim6_filtered, sim7_filtered, sim8_filtered, sim9_filtered)
+
+rows <- rep(c(60, 120, 240), 3) ## Number of rows for the complete dataframes with N = 4/ N = 8/ N = 16.  
+
+missingdata_histograms <- matrix(nrow = N_sims, ncol = 9)
+
+for (i in 1:9) {
+  missingdata_histograms[,i] <- lapply(masterlist_filt[[i]], function(x) {1- (nrow(x)/rows[i])}[1]) %>%
+    bind_cols() %>%
+    pivot_longer(cols = everything()) %>% pull(value) #%>% hist(main = i, breaks = 40)
+}
+
+colnames(missingdata_histograms) <- c("sim 1", "sim 2", "sim 3", "sim 4", "sim 5", "sim 6", "sim 7", "sim 8", "sim 9")
+
+missingdata_histograms %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything()) %>% 
+  mutate(vline = case_when(name %in% c("sim 1", "sim 2", "sim 3") ~ .10,
+                           name %in% c("sim 4", "sim 5", "sim 6") ~ .33,
+                           name %in% c("sim 7", "sim 8", "sim 9") ~ .66)) %>% 
+  ggplot(aes(value))+
+  geom_histogram(bins =40)+
+  geom_vline(aes(xintercept = vline), linetype = 2, color = "gold")+
+  facet_wrap(~name)+
+  theme_bw()+
+  theme(aspect.ratio = .7,
+        panel.grid = element_blank()) -> missingdata_histograms_plot
+```
+
+```{r final histogram}
+table_descript$Samplings.NOT.reaching.Wmax....
+plottext <- table_descript %>% 
+  transmute(name = paste0("sim ", ID),
+            missing = `Samplings.NOT.reaching.Wmax....`,
+            n_sampl = Samplings)
+
+missingdata_histograms %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything()) %>% 
+  mutate(vline = case_when(name %in% c("sim 1", "sim 2", "sim 3") ~ .10,
+                           name %in% c("sim 4", "sim 5", "sim 6") ~ .4,
+                           name %in% c("sim 7", "sim 8", "sim 9") ~ .7)) 
+
+missingdata_histograms_plot+
+  geom_text(x = .7, y = 600, aes(label = paste0("N = ", n_sampl, "\n ", missing, "% missing ")), data = plottext)+
+  theme_minimal()+
+  theme(plot.background = element_rect(fill = "white"))
+
+ggsave("../../output/figures/supplementary1_05162022.tiff", width = 5, height = 7)
+```
+
+
+### Fit to a NL model  
+#### Fit everything:  
+```{r fit, message=FALSE, warning=FALSE}
+fits <- lapply(final_df_clean,
+               function(x) {
+                 df <- x
+                 v <- list()
+                 for (i in 1:9) {
+                   tryCatch({
+                     v[[i]] <- nls(nl_nc ~ A1 * nl_wmax^(-A2),
+                                   start = list(A1 = A1.true, A2 = A2.true),
+                                   data = df %>% filter(sim_id ==i) %>% 
+                                   dplyr::select(nl_nc, nl_wmax) %>% unique())    },
+                     error = function(e) {})
+                   
+                   if(skip_to_next) { next }
+                   }
+                 return(v)
+       })
+```
+
+#### Check point estimates  
+
+Get the coefficients:   
+```{r get a1 a2}
+coefs_a1 <- list()
+coefs_a2 <- list()
+for (i in 1:N_sims) {
+  coefs_a1[[i]] <- lapply(fits[[i]], function(x) {coef(x)[1]})
+  coefs_a2[[i]] <- lapply(fits[[i]], function(x) {coef(x)[2]})
+}
+```
+
+
+Merge it into a dataframe:  
+```{r res dataframe}
+results <- data.frame(A1_sim1 = numeric(N_sims),
+                      A1_sim2 = numeric(N_sims),
+                      A1_sim3 = numeric(N_sims),
+                      A1_sim4 = numeric(N_sims),
+                      A1_sim5 = numeric(N_sims),
+                      A1_sim6 = numeric(N_sims),
+                      A1_sim7 = numeric(N_sims),
+                      A1_sim8 = numeric(N_sims),
+                      A1_sim9 = numeric(N_sims),
+                      A2_sim1 = numeric(N_sims),
+                      A2_sim2 = numeric(N_sims),
+                      A2_sim3 = numeric(N_sims),
+                      A2_sim4 = numeric(N_sims),
+                      A2_sim5 = numeric(N_sims),
+                      A2_sim6 = numeric(N_sims),
+                      A2_sim7 = numeric(N_sims),
+                      A2_sim8 = numeric(N_sims),
+                      A2_sim9 = numeric(N_sims) )
+
+for (i in 1:N_sims) {
+  for (k in 1:9) {
+    
+  tryCatch({
+    results[i, k] <- coefs_a1[[i]][[k]]
+    results[i, 9+k] <- coefs_a2[[i]][[k]]
+    },
+    error = function(e) {})
+  if(skip_to_next) { next }
+  }
+}
+head(results)
+```
+
+Visualize the results:  
+```{r PE viz 1}
+results %>% 
+  pivot_longer(cols = everything()) %>% 
+  separate(name, c("parameter", "simulation_id")) %>%
+  filter(value!=0) %>% 
+  ggplot(aes(value))+
+  geom_histogram(bins = 80)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')
+```
+
+#### Check confidence intervals:  
+```{r CIs dataframe, message=FALSE, warning=FALSE}
+# create the space
+uncertainty <- data.frame(
+  A1_lb_sim1 = numeric(N_sims),
+  A1_lb_sim2 = numeric(N_sims),
+  A1_lb_sim3 = numeric(N_sims),
+  A1_lb_sim4 = numeric(N_sims),
+  A1_lb_sim5 = numeric(N_sims),
+  A1_lb_sim6 = numeric(N_sims),
+  A1_lb_sim7 = numeric(N_sims),
+  A1_lb_sim8 = numeric(N_sims),
+  A1_lb_sim9 = numeric(N_sims),
+  A1_ub_sim1 = numeric(N_sims),
+  A1_ub_sim2 = numeric(N_sims),
+  A1_ub_sim3 = numeric(N_sims),
+  A1_ub_sim4 = numeric(N_sims),
+  A1_ub_sim5 = numeric(N_sims),
+  A1_ub_sim6 = numeric(N_sims),
+  A1_ub_sim7 = numeric(N_sims),
+  A1_ub_sim8 = numeric(N_sims),
+  A1_ub_sim9 = numeric(N_sims),
+  A2_lb_sim1 = numeric(N_sims),
+  A2_lb_sim2 = numeric(N_sims),
+  A2_lb_sim3 = numeric(N_sims),
+  A2_lb_sim4 = numeric(N_sims),
+  A2_lb_sim5 = numeric(N_sims),
+  A2_lb_sim6 = numeric(N_sims),
+  A2_lb_sim7 = numeric(N_sims),
+  A2_lb_sim8 = numeric(N_sims),
+  A2_lb_sim9 = numeric(N_sims),
+  A2_ub_sim1 = numeric(N_sims),
+  A2_ub_sim2 = numeric(N_sims),
+  A2_ub_sim3 = numeric(N_sims),
+  A2_ub_sim4 = numeric(N_sims),
+  A2_ub_sim5 = numeric(N_sims),
+  A2_ub_sim6 = numeric(N_sims),
+  A2_ub_sim7 = numeric(N_sims),
+  A2_ub_sim8 = numeric(N_sims),
+  A2_ub_sim9 = numeric(N_sims))
+
+
+for (i in 1:N_sims) {
+  for (k in 1:9) {
+    
+  tryCatch({
+    confints <- confint(fits[[i]][[k]])
+    uncertainty[i, k] <- confints[1] 
+    uncertainty[i, k+9] <- confints[3] 
+    uncertainty[i, k+18] <- confints[2] 
+    uncertainty[i, k+27] <- confints[4] 
+    },
+    error = function(e) {})
+  if(skip_to_next) { next }
+  }
+}
+
+```
+
+Visual check:  
+```{r viz CIs}
+uncertainty %>% 
+  mutate(iter = 1:nrow(uncertainty)) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "simulation_id")) %>%
+  filter(value!=0) %>%
+  pivot_wider(names_from = "extreme", values_from = "value") %>% 
+  ggplot(aes(lb, iter))+
+  geom_errorbarh(aes(xmin = lb, xmax = ub, 
+                     color = ifelse(parameter =="A1",
+                                    ifelse(lb<A1.true & ub>A1.true, "within", "outside"),
+                                    ifelse(lb<A2.true & ub> A2.true, "within", "outside"))),
+                 height = 0)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')+  
+  labs(color = "P.E. within/outside C.I.",
+       x = "", 
+       y = "iteration")
+```
+
+### Save this  1/2 (N_sims x) iteration as RDS  
+
+```{r save, eval=FALSE, include=FALSE}
+saveRDS(results, "simulation_files/results_5n_500_05162022.rds")
+saveRDS(uncertainty, "simulation_files/uncertainty_5n_500_05162022.rds")
+saveRDS(final_df, "simulation_files/final_df_500_05162022.rds")
+saveRDS(final_df_clean, "simulation_files/final_df_clean_500_05162022.rds")
+```
+
+```{r}
+final_df <- readRDS("simulation_files/final_df_500_05162022.rds")
+
+```
+
+## Visualizations  
+
+```{r create final results, eval=TRUE, include=FALSE}
+finalresults <- data.frame()
+finaluncertainty <- data.frame()
+
+for (i in c(500)) {
+  finalresults <-finalresults %>% bind_rows( readRDS(paste0("simulation_files/results_", i,"_05022022.rds")))
+  finaluncertainty <- finaluncertainty %>% bind_rows( readRDS(paste0("simulation_files/uncertainty_", i,"_05022022.rds")))
+}
+```
+
+```{r fake, include=TRUE, eval=FALSE}
+finalresults <- results
+finaluncertainty <- uncertainty
+```
+
+
+```{r final res}
+finalresults %>% 
+  mutate(iter = 1:nrow(finalresults)) %>% 
+  pivot_longer(cols = A1_sim1:A2_sim9) %>% 
+  separate(name, c("parameter", "simulation_id")) %>%
+  rename(point_est = value) %>% 
+  left_join(
+    finaluncertainty %>%
+      mutate(iter = 1:nrow(finaluncertainty)) %>%
+      pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>%
+      separate(name, c("parameter", "extreme", "simulation_id")) %>%
+      # filter(value!=0) %>%
+      pivot_wider(names_from = "extreme", values_from = "value"),
+    by = c("parameter", "simulation_id", "iter")) %>%
+  filter(lb!=0 & point_est !=0) %>% 
+  ggplot(aes(point_est))+
+  geom_histogram(aes(fill = ifelse(parameter =="A1",
+                                   ifelse(lb<A1.true & ub>A1.true, "within", "outside"),
+                                   ifelse(lb<A2.true & ub> A2.true, "within", "outside"))),
+                 bins = 50)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')+
+  labs(fill = "P.E. within/outside C.I.",
+       x = "Point estimate")+
+  scale_fill_manual(values = c("#ee6c4d", "#adc178"))
+```
+
+```{r PE viz 2}
+finalresults %>% 
+  pivot_longer(cols = everything()) %>% 
+  separate(name, c("parameter", "simulation_id")) %>%
+  filter(value!=0) %>% 
+  ggplot(aes(value))+
+  geom_histogram()+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')
+
+```
+
+```{r unc viz}
+finaluncertainty %>% 
+  mutate(iter = 1:nrow(finaluncertainty)) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "simulation_id")) %>%
+  filter(value!=0) %>%
+  pivot_wider(names_from = "extreme", values_from = "value") %>% 
+  ggplot(aes(lb, iter))+
+  geom_errorbarh(aes(xmin = lb, xmax = ub, 
+                     color = ifelse(parameter =="A1",
+                                    ifelse(lb<A1.true & ub>A1.true, "within", "outside"),
+                                    ifelse(lb<A2.true & ub> A2.true, "within", "outside"))))+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')+
+  labs(color = "P.E. within/outside C.I.",
+       x = "Point estimate")+
+  theme(legend.position = "bottom")+
+  scale_color_manual(values = c("#ee6c4d", "#adc178"))
+```
+
+```{r diag}
+get.proportion <- function(x, na.rm = TRUE){x/500}
+finaluncertainty %>% 
+  mutate(iter = 1:nrow(finaluncertainty)) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "simulation_id")) %>%
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_within = ifelse((A1_lb < A1.true & A1_ub >A1.true), "yes", "no"),
+         a2_within = ifelse((A2_lb < A2.true & A2_ub >A2.true), "yes", "no")) %>% 
+  # filter(value==0) %>% 
+  group_by(simulation_id, a1_within, a2_within) %>% 
+  summarise(n  = length(iter)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = c(a1_within, a2_within), values_from = n) %>% 
+  mutate_at(vars("no_no", "no_yes", "yes_no", "yes_yes"), funs(get.proportion)) %>% 
+  group_by(simulation_id) %>% 
+  transmute(simulation_id, 
+            at_least_1 = sum(no_yes,yes_no,yes_yes, na.rm = T), 
+            allright = yes_yes,
+            none = no_no)
+```
+
+# Bayesian  
+
+
+## JAGS Model   
+From Makowski et al. (2020)  
+```{r dilutions}
+modelstring <- "model {
+for (i in 1:Q)
+{
+W[i]~dnorm(mu[i], tau_b)
+N[i]~dnorm(Nc[Date[i]], tau_n)
+mu[i]<-min(Bmax[Date[i]], Bmax[Date[i]]+S[Date[i]]*(N[i]-Nc[Date[i]]))
+}
+for (j in 1:K)
+{
+Nc[j]=A1*Bmax[j]^(-A2)
+Bmax[j]~dnorm(Mu_Bmax,Prec_Bmax)T(0,)
+S[j]~dnorm(Mu_S,Prec_S)T(0,)
+}
+
+Mu_Bmax~dnorm(6,0.1)
+Mu_S~dnorm(0,0.1)
+A1~dunif(2,6)
+A2~dunif(0,0.65)
+Prec_Bmax~dgamma(0.001,0.001)
+Prec_S~dgamma(0.001,0.001) 
+tau_b~dgamma(0.001,0.001)
+tau_n~dgamma(0.001,0.001)
+}"
+
+writeLines(modelstring, con="modelstring.txt")
+```
+
+### run simulations  
+
+```{r fitting_sampling, eval=FALSE, include=TRUE}
+### 1
+masterlist <- list(sim1, sim2, sim3, sim4, sim5, sim6, sim7, sim8, sim9)
+
+results_bayes <- list(matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8)
+                      )
+
+tictoc::tic()
+for (k in 1:length(masterlist)) {
+
+  bayesresults_sim <- lapply(masterlist[[k]][1:(N_sims)], function(x) {
+    
+    f <- x
+  
+  model<-jags.model('modelstring.txt',
+                    data=list('W' = f$W, 'N' = f$Nact, 'Date' = f$sampling,
+                              'Q' = nrow(f), 
+                              'K' = n_distinct(f$sampling)),
+                  n.chains=3, n.adapt=1000)
+  
+  update(model, n.iter=1000)
+  
+  samples <- coda.samples(model, variable.names=c("A1","A2"), n.iter=130000, 
+                          thin=10)
+  
+  })
+  
+  for (i in 1:(N_sims)) {
+    
+    results_bayes[[k]][i, ] <-
+      as.matrix(bayesresults_sim[[i]]) %>%
+      as.data.frame() %>%
+      summarise(A1_p025 = quantile(A1, probs  =.025),
+                A1_p975 = quantile(A1, probs  =.975),
+                A1_mean = mean(A1),
+                A1_rhat = (gelman.diag(bayesresults_sim[[i]]))[[1]][1,1],
+                A2_p025 = quantile(A2, probs  =.025),
+                A2_p975 = quantile(A2, probs  =.975),
+                A2_mean = mean(A2),
+                A2_rhat = (gelman.diag(bayesresults_sim[[i]]))[[1]][2,1]) %>%
+      as.matrix()
+    }
+  
+  colnames(results_bayes[[k]]) <- c("A1_p025", "A1_p975", "A1_mean", "A1_rhat",
+                                    "A2_p025", "A2_p975", "A2_mean", "A2_rhat")
+  saveRDS(results_bayes[[k]], paste0("simulation_files/bayesian/bayesresults_sim", k,"_1000.rds"))
+}
+tictoc::toc()
+```
+
+
+```{r fit bayes, eval=FALSE}
+masterlist <- list(sim1_filtered, sim2_filtered, sim3_filtered, sim4_filtered,
+                   sim5_filtered, sim6_filtered, sim7_filtered, sim8_filtered, sim9_filtered)
+
+results_bayes <- list(matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8),
+                      matrix(nrow = N_sims, ncol = 8))
+
+tictoc::tic()
+for (k in 1:length(masterlist)) {
+
+  bayesresults_sim <- lapply(masterlist[[k]][1:(N_sims)], function(x) {
+    
+    f <- x
+  
+  model<-jags.model('modelstring.txt',
+                    data=list('W' = f$W, 'N' = f$Nact, 'Date' = f$sampling,
+                              'Q' = nrow(f), 
+                              'K' = n_distinct(f$sampling)),
+                  n.chains=3, n.adapt=1000)
+  
+  update(model, n.iter=1000)
+  
+  samples <- coda.samples(model, variable.names=c("A1","A2"), n.iter=130000, 
+                          thin=10)
+  
+  })
+  
+  for (i in 1:(N_sims)) {
+    
+    results_bayes[[k]][i, ] <-
+      as.matrix(bayesresults_sim[[i]]) %>%
+      as.data.frame() %>%
+      summarise(A1_p025 = quantile(A1, probs  =.025),
+                A1_p975 = quantile(A1, probs  =.975),
+                A1_mean = mean(A1),
+                A1_rhat = (gelman.diag(bayesresults_sim[[i]]))[[1]][1,1],
+                A2_p025 = quantile(A2, probs  =.025),
+                A2_p975 = quantile(A2, probs  =.975),
+                A2_mean = mean(A2),
+                A2_rhat = (gelman.diag(bayesresults_sim[[i]]))[[1]][2,1]) %>%
+      as.matrix()
+    }
+  
+  colnames(results_bayes[[k]]) <- c("A1_p025", "A1_p975", "A1_mean", "A1_rhat",
+                                    "A2_p025", "A2_p975", "A2_mean", "A2_rhat")
+  saveRDS(results_bayes[[k]], paste0("simulation_files/bayesian/tradbayesresults_sim", k,"_1000.rds"))
+}
+tictoc::toc()
+```
+
+## Post beocat  
+
+```{r hidden read, include=FALSE}
+bayesresults <- data.frame()
+
+for (i in 1:9) {
+  bayesresults <- bayesresults %>% 
+    bind_rows(
+      as.data.frame(readRDS(paste0("simulation_files/beocat/tradbayesresults_sim", i, "_500.rds"))) %>%
+        mutate(sim_id = i, iter = 1:N_sims))
+}
+```
+
+```{r fake read 1, include=TRUE, eval=FALSE}
+bayesresults <- data.frame()
+
+for (i in 1:9) {
+  bayesresults <- bayesresults %>% 
+    bind_rows(
+      as.data.frame(readRDS(paste0("simulation_files/bayesian/bayesresults_sim", k,"_1000.rds"))) %>%
+        mutate(sim_id = i, iter = 1:N_sims))
+}
+```
+
+
+```{r bayesresult plot}
+bayesresults_plot <- bayesresults %>% 
+  pivot_longer(cols = A1_p025:A2_rhat) %>% 
+  separate(name, c("param", "quant")) %>% 
+  pivot_wider(names_from = "quant", values_from = "value") %>% 
+  ggplot(aes(mean, iter))+
+  geom_errorbarh(aes(xmin = p025, xmax = p975, 
+                     color = ifelse(param == "A1" , 
+                                    ifelse(p025 < A1.true & p975 > A1.true, "within", "outside"), 
+                                    ifelse(p025 < A2.true & p975 > A2.true, "within", "outside"))),
+                 height = 0)+
+  facet_grid(sim_id~param, scales = 'free')+
+  geom_vline(aes(xintercept = ifelse(param == "A1", A1.true, A2.true)), color = "gold")+
+  labs(color = "P.E. within/outside C.I.",
+       x = "Point estimate")+
+  theme(legend.position = "bottom")+
+  theme_minimal()+
+  theme(plot.background = element_rect(fill = "white"))
+  
+ggsave("output/figures/newBAYES_rev_05192022.tiff", width = 8, height = 12)
+
+```
+
+```{r more bayesresults plot}
+bayesresults %>% pivot_longer(cols = A1_p025:A2_rhat) %>% 
+  separate(name, c("param", "quant")) %>% 
+  pivot_wider(names_from = "quant", values_from = "value") %>% 
+  ggplot(aes(mean))+
+  geom_histogram(aes(fill = ifelse(param == "A1" , 
+                                    ifelse(p025 < A1.true & p975 > A1.true, "within", "outside"), 
+                                    ifelse(p025 < A2.true & p975 > A2.true, "within", "outside"))),
+                 bins = 30)+
+  geom_vline(aes(xintercept = ifelse(param =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(sim_id~param, scales = 'free')+
+  labs(fill = "P.E. within/outside C.I.",
+       x = "Point estimate")
+```
+
+
+
+## Comparison  
+
+
+```{r mle plot}
+traditionalMLE_plot <-  finaluncertainty[1:500, ] %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  pivot_wider(names_from = "extreme", values_from = "value") %>% 
+
+  ggplot(aes(lb, iter))+
+  geom_errorbarh(aes(xmin = lb, xmax = ub, 
+                     color = ifelse(parameter =="A1",
+                                    ifelse(lb<A1.true & ub>A1.true, "within", "outside"),
+                                    ifelse(lb<A2.true & ub> A2.true, "within", "outside"))),
+                 height =0)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), color = "gold")+
+  facet_grid(sim_id~parameter, scales = 'free')+
+  labs(color = "P.E. within/outside C.I.",
+       x = "Point estimate")+
+  theme(legend.position = "bottom")+
+  coord_cartesian(ylim = c(1,500))+
+  theme_minimal()+
+  theme(plot.background = element_rect(fill = "white"))
+
+ggsave("output/figures/500iter_traditionalMLE_rev.tiff", width = 8, height = 12)
+  
+```
+
+Checking CI calibration   
+```{r calib}
+bayesresults_calib <- bayesresults %>% 
+  mutate(a1_calibrated = ifelse(A1_p025 < A1.true & A1_p975 > A1.true, "yes", "no")) %>% 
+  mutate(a2_calibrated = ifelse(A2_p025 < A2.true & A2_p975 > A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_mean)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+no_yes)/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("param", NA))
+
+mleresults_calib <- finaluncertainty[1:500, ] %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  na.omit(value) %>% 
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(no_yes), 0, no_yes))/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+```{r mle jhbkd, eval=TRUE, include=TRUE}
+traditionalMLE_plot <- traditionalMLE_plot+geom_text(data = mleresults_calib,
+                              aes(x = ifelse(parameter == "A1", 7.5, .7),
+                                  y = 400,
+                                  label = round(calib, 2)))
+
+bayesresults_plot <- bayesresults_plot+geom_text(data = bayesresults_calib,
+                              aes(x = ifelse(param == "A1", 5.5, .59),
+                                  y = 400,
+                                  label = round(calib, 2)))
+```
+
+### Figure 1  
+```{r fig 1, eval=FALSE, include=FALSE}
+ggarrange(traditionalMLE_plot+theme(legend.position = "none")+rremove("y.text")+rremove("xlab")+
+            scale_color_manual(values = c("#ee6c4d", "#adc178")),
+          bayesresults_plot+theme(legend.position = "bottom")+rremove("y.text")+rremove("xlab")+
+            scale_color_manual(values = c("#ee6c4d", "#adc178")),
+          ncol = 2,
+          labels = c("MLE", "Bayesian"),
+          common.legend = TRUE,
+          label.x = .3)
+
+# ggsave("output/figures/500iter_arranged_rev_05192022.tiff", width = 7, height = 9)
+```
+
+
+# Comparing method results  
+#### Point estimates    
+
+```{r results pe csv}
+final_results <-
+  bayesresults %>% transmute(A1 = A1_mean, A2 = A2_mean, sim_id, iter, method = "Bayesian") %>% 
+  bind_rows(
+    results %>%
+      rownames_to_column("iter") %>%
+      pivot_longer(cols = A1_sim1:A2_sim9) %>%
+      separate("name", c("par", "sim_id")) %>%
+      mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+      pivot_wider(names_from = "par", values_from = "value") %>% 
+      mutate(method = "MLE")
+  )
+
+final_results %>%
+  group_by(method, sim_id) %>% 
+  summarise_at(vars(A1, A2), funs(mean)) %>%
+  ungroup() %>% dplyr::select(-A2) %>% unique() %>% 
+  mutate(A1 = A1 %>% round(2)) %>% 
+  pivot_wider(names_from = method, values_from = A1) %>%
+  write_csv("output/A1_results_rev_05192022.csv")
+final_results %>%
+  group_by(method, sim_id) %>% 
+  summarise_at(vars(A1, A2), funs(mean)) %>%
+  ungroup() %>% dplyr::select(-A1) %>% unique() %>% 
+  mutate(A2 = A2 %>% round(2)) %>% 
+  pivot_wider(names_from = method, values_from = A2) %>% 
+  write_csv("output/A2_results_rev_05192022.csv")
+  
+```
+
+
+####  CIs  
+```{r results CI csv}
+final_uncertainty <-
+  bayesresults %>% transmute(A1_width = A1_p975 - A1_p025, A2_width = A2_p975 - A2_p025, sim_id, iter, method = "Bayesian") %>% 
+  bind_rows(
+    uncertainty %>%
+      rownames_to_column("iter") %>%
+      pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>%
+      separate("name", c("par","extreme", "sim_id")) %>%
+      mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+      pivot_wider(names_from = c("par", "extreme"), values_from = "value") %>%
+      transmute(iter, sim_id, A1_width = A1_ub - A1_lb, A2_width = A2_ub - A2_lb) %>% 
+      mutate(method = "MLE")
+  )
+
+final_uncertainty %>%
+  group_by(method, sim_id) %>% 
+  summarise_at(vars(A1_width, A2_width), funs(mean)) %>%
+  ungroup() %>% dplyr::select(-A2_width) %>% unique() %>% 
+  mutate(A1_width = A1_width %>% round(2)) %>% 
+  pivot_wider(names_from = method, values_from = A1_width) %>%
+  dplyr::select(sim_id, `MLE`, `Bayesian`) %>% 
+  write_csv("output/A1_uncert_rev_05192022.csv")
+
+final_uncertainty %>%
+  group_by(method, sim_id) %>% 
+  summarise_at(vars(A1_width, A2_width), funs(mean)) %>%
+  ungroup() %>% dplyr::select(-A1_width) %>% unique() %>% 
+  mutate(A2_width = A2_width %>% round(2)) %>% 
+  pivot_wider(names_from = method, values_from = A2_width) %>%
+  dplyr::select(sim_id, `MLE`, `Bayesian`) %>% 
+  write_csv("output/A2_uncert_rev_05192022.csv")
+```
+
+## Mean Bias Error    
+
+```{r bias 1}
+final_results %>% 
+  group_by(method) %>% 
+  nest() %>% 
+  summarise(MBE_A1 = data %>% map_dbl(~metrica::MBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+         MBE_A2 = data %>% map_dbl(~metrica::MBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>% 
+  write_csv("output/MBE_rev.csv")
+```
+
+```{r}
+missingdf <- missingdata_histograms %>% colMeans() %>%  as.data.frame() %>% 
+  rename(missing = ".") %>% 
+  rownames_to_column("sim_id") %>%
+  mutate(sim_id = substr(sim_id, 5,5) %>% as.numeric())
+```
+
+
+```{r bias pbe}
+final_results %>% 
+  left_join(missingdf) %>% 
+  group_by(method, sim_id, missing) %>% 
+  nest() %>% 
+  summarise(A1 = data %>% map_dbl(~metrica::PBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+         A2 = data %>% map_dbl(~metrica::PBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>%
+  ungroup() %>% 
+  pivot_longer(cols = c(A1, A2)) %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  ggplot(aes(missing, value))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(N~name, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Percentage Bias Error (%)",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+ggsave("output/figures/PBE2_rev_05192022.tiff", width = 6, height = 5)
+```
+
+
+
+```{r}
+bayesresults_calib %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib %>% mutate(method = "MLE") %>% rename(param = parameter)
+  ) %>% left_join(
+    missingdf , by = "sim_id") %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  unite("methodN", c(method, N), remove = F) %>% 
+  ggplot(aes(missing, calib))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(N~param, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Coverage Probability",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+ggsave("output/figures/CP_rev_05192022.tiff", width = 6, height = 5)
+```
+
+
+```{r bias 2, eval=FALSE, include=FALSE}
+final_results %>% 
+  group_by(method, sim_id) %>% 
+  nest() %>% 
+  summarise(MBE_A1 = data %>% map_dbl(~metrica::MBE(obs = .$A1, pred = rep(3.5, length(.$A1)))),
+         MBE_A2 = data %>% map_dbl(~metrica::MBE(obs = .$A2, pred = rep(0.35, length(.$A2))))) %>% 
+  write_csv("output/MBE_bysim.csv")
+```
+
+```{r fig 1 pp, eval=FALSE, include=FALSE}
+ggarrange(traditionalMLE_plot+theme(legend.position = "none")+rremove("y.text")+
+              scale_color_manual(values = c("#ee6c4d", "#adc178")),
+            bayesresults_plot+theme(legend.position = "none")+rremove("y.text")+scale_color_manual(values = c("#ee6c4d", "#adc178")),
+            labels = c("Trad. MLE", "Trad. Bayesian", "New Bayesian"),
+          label.x = c(.1, .03, .02),
+          common.legend = TRUE,
+          ncol =2,
+          align = "hv")
+
+ggsave("output/figures/500iter_pp.tiff", width = 8, height = 6)
+```
+
+
+### Bayes  
+
+```{r}
+
+```
+
+
+# 4 N rates  
+
+
+### Simulate dilutions  
+```{r sim dilutions}
+N_sims <- 1000
+Nrates <- 4
+set.seed(42)
+## 1. n1 obs, 0% missing plateaus
+sim1 <- list()
+
+for (i in 1:N_sims) {
+  sim1[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                        N_nrates = Nrates, N_reps = 3,
+                        Bmax_v = (Bmax_v[-remove1])[ss1_1[i,]],
+                        s_v = (s_v[-remove1])[ss1_1[i,]],
+                        Nstart_v = (Nstart_v[-remove1])[ss1_1[i,]],
+                        sy_v = factor(1:n1),
+                        var = FALSE,
+                        Nact_ul = .45)
+}
+
+## 1. n2 obs, 0% missing plateaus
+
+sim2 <- list()
+for (i in 1:N_sims) {
+  sim2[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = (Bmax_v[-remove1])[ss2_1[i,]],
+                 s_v = (s_v[-remove1])[ss2_1[i,]], 
+                 Nstart_v = (Nstart_v[-remove1])[ss2_1[i,]], 
+                 sy_v = factor(1:n2),
+                 var = FALSE,
+                 Nact_ul = 0.35)
+  }
+
+
+
+## 3. n3 obs, 0% missing plateaus
+sim3 <- list()
+for (i in 1:N_sims) {
+  sim3[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = (Bmax_v[-remove1])[ss3_1[i,]],
+                 s_v = (s_v[-remove1])[ss3_1[i,]], 
+                 Nstart_v = (Nstart_v[-remove1])[ss3_1[i,]], 
+                 sy_v = factor(1:n3),
+                 var = FALSE,
+                 Nact_ul = 0.35)
+  }
+
+
+
+## 4. n1 obs, 33% missing plateaus (.25)
+sim4 <- list()
+for(i in 1:N_sims){
+sim4[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss1[i,]],
+                 s_v = s_v[ss1[i,]], 
+                 Nstart_v = Nstart_v[ss1[i,]], 
+                 sy_v = factor(1:n1),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 5. n2 obs, 33% missing plateaus (.25)
+sim5 <- list()
+for(i in 1:N_sims){
+sim5[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss2[i,]],
+                 s_v = s_v[ss2[i,]], 
+                 Nstart_v = Nstart_v[ss2[i,]], 
+                 sy_v = factor(1:n2),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 6. n3 obs, 33% missing plateaus
+sim6 <- list()
+for(i in 1:N_sims){
+sim6[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss3[i,]],
+                 s_v = s_v[ss3[i,]], 
+                 Nstart_v = Nstart_v[ss3[i,]], 
+                 sy_v = factor(1:n3),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 7. n1 obs, 66% missing plateaus
+sim7 <- list()
+for(i in 1:N_sims) {
+sim7[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss1[i,]],
+                 s_v = s_v[ss1[i,]], 
+                 Nstart_v = Nstart_v[ss1[i,]], 
+                 sy_v = factor(1:n1),
+                 var = TRUE,
+                 Nact_ul = .0965)
+}
+
+## 5. n2 obs, 33% missing plateaus (.25)
+sim8 <- list()
+for(i in 1:N_sims) {
+sim8[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss2[i,]],
+                 s_v = s_v[ss2[i,]], 
+                 Nstart_v = Nstart_v[ss2[i,]], 
+                 sy_v = factor(1:n2),
+                 var = TRUE,
+                 Nact_ul = .09)
+}
+
+## 9. n3 obs, 66% missing plateaus (.25)
+sim9 <- list()
+
+for(i in 1:N_sims) {
+sim9[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss3[i,]],
+                 s_v = s_v[ss3[i,]], 
+                 Nstart_v = Nstart_v[ss3[i,]], 
+                 sy_v = factor(1:n3),
+                 var = TRUE,
+                 Nact_ul = .09)
+}
+```
+
+### Fit Linear-plateau  
+
+```{r fake N_sims, eval=TRUE, include=FALSE}
+N_sims <- 500
+```
+
+```{r map linear-plateau, message = FALSE, warning=FALSE, eval=FALSE}
+a <- list()
+for (i in 1:N_sims){
+  a[[i]] <- lapply(list(sim1[[i]], sim2[[i]], sim3[[i]], sim4[[i]], sim5[[i]], sim6[[i]], sim7[[i]], sim8[[i]], sim9[[i]]),
+                   map_lp)
+}
+```
+
+```{r}
+# a %>% saveRDS("a_500_4nrates_05172022.rds")
+N_sims <- 500
+a <- readRDS("a_500_4nrates_05172022.rds")
+```
+
+
+```{r plateaus yes-no}
+plateaus <- list()
+
+for (i in 1:N_sims){
+  plateaus[[i]] <- lapply(a[[1]],
+                   function(x) {spot_nulls(x) %>% as.numeric() })
+}
+```
+
+
+#### Check that the nr of missing plateaus is approx correct  
+
+```{r check missing perc}
+missing <- data.frame(
+  sim1 = numeric(N_sims),
+  sim2 = numeric(N_sims),
+  sim3 = numeric(N_sims),
+  sim4 = numeric(N_sims),
+  sim5 = numeric(N_sims),
+  sim6 = numeric(N_sims),
+  sim7 = numeric(N_sims),
+  sim8 = numeric(N_sims),
+  sim9 = numeric(N_sims))
+
+for (i in 1:N_sims) {
+  tryCatch({
+    missing[i, 1] <- mean(plateaus[[i]][[1]])
+    missing[i, 2] <- mean(plateaus[[i]][[2]])
+    missing[i, 3] <- mean(plateaus[[i]][[3]])
+    missing[i, 4] <- mean(plateaus[[i]][[4]])
+    missing[i, 5] <- mean(plateaus[[i]][[5]])
+    missing[i, 6] <- mean(plateaus[[i]][[6]])
+    missing[i, 7] <- mean(plateaus[[i]][[7]])
+    missing[i, 8] <- mean(plateaus[[i]][[8]])
+    missing[i, 9] <- mean(plateaus[[i]][[9]])},
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+  if(skip_to_next) { next }
+}
+
+missing %>% summarise_at(vars(sim1:sim9), funs(mean))
+```
+
+### Final dataframe   
+
+```{r final_df, message=FALSE, warning=FALSE, eval=FALSE, include=TRUE}
+final_df <- list()
+for (i in 1:N_sims){
+final_df[[i]] <-  sim1[[i]] %>% 
+  left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[1]]) %>%
+              mutate(sy = id %>% as.factor(),
+                     sim_id = 1,
+                     nl_nc = get_nc_fromlist(a[[i]][[1]]),
+                     nl_wmax = get_wmax_fromlist(a[[i]][[1]]))) %>% 
+  left_join(compare_aic(dataframe = sim1[[i]], nl_list = a[[i]][[1]]) %>% dplyr::select(sy, recomm)) %>% 
+  bind_rows(sim2[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[2]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 2,
+                                        nl_nc = get_nc_fromlist(a[[i]][[2]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[2]]))) %>% 
+              left_join(compare_aic(dataframe = sim2[[i]], nl_list = a[[i]][[2]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim3[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[3]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 3,
+                                        nl_nc = get_nc_fromlist(a[[i]][[3]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[3]]))) %>% 
+              left_join(compare_aic(dataframe = sim3[[i]], nl_list = a[[i]][[3]]) %>% dplyr::select(sy, recomm))) %>%
+  bind_rows(sim4[[i]] %>% left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[4]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 4,
+                                        nl_nc = get_nc_fromlist(a[[i]][[4]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[4]]))) %>% 
+              left_join(compare_aic(dataframe = sim4[[i]], nl_list = a[[i]][[4]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim5[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[5]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 5,
+                                        nl_nc = get_nc_fromlist(a[[i]][[5]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[5]]))) %>% 
+              left_join(compare_aic(dataframe = sim5[[i]], nl_list = a[[i]][[5]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim6[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[6]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 6,
+                                        nl_nc = get_nc_fromlist(a[[i]][[6]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[6]]))) %>% 
+              left_join(compare_aic(dataframe = sim6[[i]], nl_list = a[[i]][[6]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim7[[i]] %>% left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[7]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 7,
+                                        nl_nc = get_nc_fromlist(a[[i]][[7]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[7]]))) %>% 
+              left_join(compare_aic(dataframe = sim7[[i]], nl_list = a[[i]][[7]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim8[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[8]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 8,
+                                        nl_nc = get_nc_fromlist(a[[i]][[8]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[8]]))) %>% 
+              left_join(compare_aic(dataframe = sim8[[i]], nl_list = a[[i]][[8]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim9[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[9]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 9,
+                                        nl_nc = get_nc_fromlist(a[[i]][[9]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[9]]))) %>% 
+              left_join(compare_aic(dataframe = sim9[[i]], nl_list = a[[i]][[9]]) %>% dplyr::select(sy, recomm))) %>% 
+  mutate(sampling = as.factor(sampling), 
+         nl_nc = ifelse(nl_nc == 0 , NA, nl_nc),
+         nl_wmax = ifelse(nl_wmax == 0 , NA, nl_wmax))
+}
+```
+
+```{r}
+final_df  <-  readRDS("final_df_4n_0516.rds")
+```
+#### Clean final DF  
+
+```{r clean df}
+final_df_clean <- lapply(final_df, function(x) {
+  x %>% filter(recomm == "nl")
+})
+```
+
+Check the amount of missing plateaus  
+
+
+```{r recomm loop}
+recomm_nl <- lapply(final_df_clean, function(x) {
+  lapply(split(x, x$sim_id),
+         function(x) {
+           n_distinct(x$sampling)
+           })
+  }) %>% bind_rows()
+
+recomm_nl %>% colMeans(na.rm = T) %>% as.data.frame() %>% 
+  rownames_to_column("sim_id") %>% 
+  pivot_wider(names_from = "sim_id", values_from = ".") %>% 
+  transmute(recomm_nl1 = 1-(`1`/4),
+            recomm_nl2 = 1-(`2`/8),
+            recomm_nl3 = 1-(`3`/16),
+            recomm_nl4 = 1-(`4`/4),
+            recomm_nl5 = 1-(`5`/8),
+            recomm_nl6 = 1-(`6`/16),
+            recomm_nl7 = 1-(`7`/4),
+            recomm_nl8 = 1-(`8`/8),
+            recomm_nl9 = 1-(`9`/16))
+```
+
+Divide into sim*_filtered (each list includes all the filtered dataframes from sim1, sim2, ... sim9)  
+
+```{r filter sims}
+N_sims <- 500
+#create objects to store the data
+sim1_filtered <- list()
+sim2_filtered <- list()
+sim3_filtered <- list()
+sim4_filtered <- list()
+sim5_filtered <- list()
+sim6_filtered <- list()
+sim7_filtered <- list()
+sim8_filtered <- list()
+sim9_filtered <- list()
+
+for (i in 1:N_sims) {
+  sim1_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 1 )
+  sim2_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 2 )
+  sim3_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 3 )
+  sim4_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 4 )
+  sim5_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 5 )
+  sim6_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 6 )
+  sim7_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 7 )
+  sim8_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 8 )
+  sim9_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 9 )
+
+}
+```
+
+
+```{r histogram}
+masterlist_filt <- list(sim1_filtered, sim2_filtered, sim3_filtered, sim4_filtered, 
+                        sim5_filtered, sim6_filtered, sim7_filtered, sim8_filtered, sim9_filtered)
+
+rows <- rep(c(60, 120, 240), 3) ## Number of rows for the complete dataframes with N = 4/ N = 8/ N = 16.  
+
+missingdata_histograms <- matrix(nrow = N_sims, ncol = 9)
+
+for (i in 1:9) {
+  missingdata_histograms[,i] <- lapply(masterlist_filt[[i]], function(x) {1- (nrow(x)/rows[i])}[1]) %>%
+    bind_cols() %>%
+    pivot_longer(cols = everything()) %>% pull(value) #%>% hist(main = i, breaks = 40)
+}
+
+colnames(missingdata_histograms) <- c("sim 1", "sim 2", "sim 3", "sim 4", "sim 5", "sim 6", "sim 7", "sim 8", "sim 9")
+
+missingdata_histograms %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything()) %>% 
+  mutate(vline = case_when(name %in% c("sim 1", "sim 2", "sim 3") ~ .10,
+                           name %in% c("sim 4", "sim 5", "sim 6") ~ .33,
+                           name %in% c("sim 7", "sim 8", "sim 9") ~ .66)) %>% 
+  ggplot(aes(value))+
+  geom_histogram(bins =40)+
+  geom_vline(aes(xintercept = vline), linetype = 2, color = "gold")+
+  facet_wrap(~name)+
+  theme_bw()+
+  theme(aspect.ratio = .7,
+        panel.grid = element_blank()) -> missingdata_histograms_plot
+```
+
+```{r final histogram}
+table_descript$Samplings.NOT.reaching.Wmax....
+plottext <- table_descript %>% 
+  transmute(name = paste0("sim ", ID),
+            missing = `Samplings.NOT.reaching.Wmax....`,
+            n_sampl = Samplings)
+
+missingdata_histograms %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything()) %>% 
+  mutate(vline = case_when(name %in% c("sim 1", "sim 2", "sim 3") ~ .10,
+                           name %in% c("sim 4", "sim 5", "sim 6") ~ .4,
+                           name %in% c("sim 7", "sim 8", "sim 9") ~ .7)) 
+
+missingdata_histograms_plot+
+  geom_text(x = .7, y = 600, aes(label = paste0("N = ", n_sampl, "\n ", missing, "% missing ")), data = plottext)+
+  theme_minimal()+
+  theme(plot.background = element_rect(fill = "white"))
+
+ggsave("../../output/figures/supplementary1_4n_05162022.tiff", width = 5, height = 7)
+```
+
+
+### Fit to a NL model  
+#### Fit everything:  
+```{r fit, message=FALSE, warning=FALSE}
+fits <- lapply(final_df_clean,
+               function(x) {
+                 df <- x
+                 v <- list()
+                 for (i in 1:9) {
+                   tryCatch({
+                     v[[i]] <- nls(nl_nc ~ A1 * nl_wmax^(-A2),
+                                   start = list(A1 = A1.true, A2 = A2.true),
+                                   data = df %>% filter(sim_id ==i) %>% 
+                                   dplyr::select(nl_nc, nl_wmax) %>% unique())    },
+                     error = function(e) {})
+                   
+                   if(skip_to_next) { next }
+                   }
+                 return(v)
+       })
+```
+
+#### Check point estimates  
+
+Get the coefficients:   
+```{r get a1 a2}
+N_sims <- 500
+coefs_a1 <- list()
+coefs_a2 <- list()
+for (i in 1:N_sims) {
+  coefs_a1[[i]] <- lapply(fits[[i]], function(x) {coef(x)[1]})
+  coefs_a2[[i]] <- lapply(fits[[i]], function(x) {coef(x)[2]})
+}
+```
+
+
+Merge it into a dataframe:  
+```{r res dataframe}
+results_4n <- data.frame(A1_sim1 = numeric(N_sims),
+                      A1_sim2 = numeric(N_sims),
+                      A1_sim3 = numeric(N_sims),
+                      A1_sim4 = numeric(N_sims),
+                      A1_sim5 = numeric(N_sims),
+                      A1_sim6 = numeric(N_sims),
+                      A1_sim7 = numeric(N_sims),
+                      A1_sim8 = numeric(N_sims),
+                      A1_sim9 = numeric(N_sims),
+                      A2_sim1 = numeric(N_sims),
+                      A2_sim2 = numeric(N_sims),
+                      A2_sim3 = numeric(N_sims),
+                      A2_sim4 = numeric(N_sims),
+                      A2_sim5 = numeric(N_sims),
+                      A2_sim6 = numeric(N_sims),
+                      A2_sim7 = numeric(N_sims),
+                      A2_sim8 = numeric(N_sims),
+                      A2_sim9 = numeric(N_sims) )
+
+for (i in 1:N_sims) {
+  for (k in 1:9) {
+    
+  tryCatch({
+    results_4n[i, k] <- coefs_a1[[i]][[k]]
+    results_4n[i, 9+k] <- coefs_a2[[i]][[k]]
+    },
+    error = function(e) {})
+  if(skip_to_next) { next }
+  }
+}
+head(results_4n)
+```
+
+Visualize the results:  
+```{r PE viz 1}
+results_4n %>% 
+  pivot_longer(cols = everything()) %>% 
+  separate(name, c("parameter", "simulation_id")) %>%
+  filter(value!=0) %>% 
+  ggplot(aes(value))+
+  geom_histogram(bins = 80)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')
+```
+
+#### Check confidence intervals:  
+```{r CIs dataframe, message=FALSE, warning=FALSE}
+# create the space
+uncertainty <- data.frame(
+  A1_lb_sim1 = numeric(N_sims),
+  A1_lb_sim2 = numeric(N_sims),
+  A1_lb_sim3 = numeric(N_sims),
+  A1_lb_sim4 = numeric(N_sims),
+  A1_lb_sim5 = numeric(N_sims),
+  A1_lb_sim6 = numeric(N_sims),
+  A1_lb_sim7 = numeric(N_sims),
+  A1_lb_sim8 = numeric(N_sims),
+  A1_lb_sim9 = numeric(N_sims),
+  A1_ub_sim1 = numeric(N_sims),
+  A1_ub_sim2 = numeric(N_sims),
+  A1_ub_sim3 = numeric(N_sims),
+  A1_ub_sim4 = numeric(N_sims),
+  A1_ub_sim5 = numeric(N_sims),
+  A1_ub_sim6 = numeric(N_sims),
+  A1_ub_sim7 = numeric(N_sims),
+  A1_ub_sim8 = numeric(N_sims),
+  A1_ub_sim9 = numeric(N_sims),
+  A2_lb_sim1 = numeric(N_sims),
+  A2_lb_sim2 = numeric(N_sims),
+  A2_lb_sim3 = numeric(N_sims),
+  A2_lb_sim4 = numeric(N_sims),
+  A2_lb_sim5 = numeric(N_sims),
+  A2_lb_sim6 = numeric(N_sims),
+  A2_lb_sim7 = numeric(N_sims),
+  A2_lb_sim8 = numeric(N_sims),
+  A2_lb_sim9 = numeric(N_sims),
+  A2_ub_sim1 = numeric(N_sims),
+  A2_ub_sim2 = numeric(N_sims),
+  A2_ub_sim3 = numeric(N_sims),
+  A2_ub_sim4 = numeric(N_sims),
+  A2_ub_sim5 = numeric(N_sims),
+  A2_ub_sim6 = numeric(N_sims),
+  A2_ub_sim7 = numeric(N_sims),
+  A2_ub_sim8 = numeric(N_sims),
+  A2_ub_sim9 = numeric(N_sims))
+
+
+for (i in 1:N_sims) {
+  for (k in 1:9) {
+    
+  tryCatch({
+    confints <- confint(fits[[i]][[k]])
+    uncertainty[i, k] <- confints[1] 
+    uncertainty[i, k+9] <- confints[3] 
+    uncertainty[i, k+18] <- confints[2] 
+    uncertainty[i, k+27] <- confints[4] 
+    },
+    error = function(e) {})
+  if(skip_to_next) { next }
+  }
+}
+
+```
+
+Visual check:  
+```{r viz CIs}
+uncertainty %>% 
+  mutate(iter = 1:nrow(uncertainty)) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "simulation_id")) %>%
+  filter(value!=0) %>%
+  pivot_wider(names_from = "extreme", values_from = "value") %>% 
+  ggplot(aes(lb, iter))+
+  geom_errorbarh(aes(xmin = lb, xmax = ub, 
+                     color = ifelse(parameter =="A1",
+                                    ifelse(lb<A1.true & ub>A1.true, "within", "outside"),
+                                    ifelse(lb<A2.true & ub> A2.true, "within", "outside"))),
+                 height = 0)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')+  
+  labs(color = "P.E. within/outside C.I.",
+       x = "", 
+       y = "iteration")
+```
+
+### Save this  1/2 (N_sims x) iteration as RDS  
+
+```{r save, eval=FALSE, include=FALSE}
+saveRDS(results_4n, "simulation_files/results_4n_500_07082022.rds")
+saveRDS(uncertainty, "simulation_files/uncertainty_4n_500_05182022.rds")
+saveRDS(final_df, "simulation_files/final_df_500_4n_05182022.rds")
+saveRDS(final_df_clean, "simulation_files/final_df_clean_500_4n_05182022.rds")
+```
+
+```{r}
+missingdf <- missingdata_histograms %>% colMeans() %>%  as.data.frame() %>% 
+  rename(missing = ".") %>% 
+  rownames_to_column("sim_id") %>%
+  mutate(sim_id = substr(sim_id, 5,5) %>% as.numeric())
+```
+
+```{r bias pbe}
+bind_rows(results %>%
+            rownames_to_column("iter") %>%
+            pivot_longer(cols = A1_sim1:A2_sim9) %>%
+            separate("name", c("par", "sim_id")) %>%
+            mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+            pivot_wider(names_from = "par", values_from = "value") %>%
+            mutate(method = "MLE - 5n"),
+          results_4n %>%
+            rownames_to_column("iter") %>%
+            pivot_longer(cols = A1_sim1:A2_sim9) %>%
+            separate("name", c("par", "sim_id")) %>%
+            mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+            pivot_wider(names_from = "par", values_from = "value") %>%
+            mutate(method = "MLE - 4n")) %>% 
+  left_join(missingdf) %>% 
+  group_by(method, sim_id, missing) %>% 
+  nest() %>% 
+  summarise(A1 = data %>% map_dbl(~metrica::PBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+         A2 = data %>% map_dbl(~metrica::PBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>%
+  ungroup() %>% 
+  pivot_longer(cols = c(A1, A2)) %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  ggplot(aes(missing, value))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(name~N, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Percentage Bias Error (%)",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+```
+
+```{r}
+mleresults_4n_calib <- uncertainty[1:500, ] %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+no_yes)/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+```{r}
+
+mleresults_5n_calib <- readRDS("simulation_files/uncertainty_500_05162022.rds")[1:500, ] %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+no_yes)/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+```{r}
+mleresults_4n_calib %>% mutate(method = "MLE - 4n") %>% rename(param = parameter) %>% bind_rows(
+    mleresults_5n_calib %>%
+      mutate(method = "MLE - 5n") %>% rename(param = parameter)
+  ) %>% left_join(
+    missingdf , by = "sim_id") %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  unite("methodN", c(method, N), remove = F) %>% 
+  ggplot(aes(missing, calib))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(param~N, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Coverage Probability",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+
+```
+
+
+### Bayes  
+```{r}
+bayesresults_4n <- data.frame()
+
+for (i in 1:9) {
+  bayesresults_4n <- bayesresults_4n %>% 
+    bind_rows(
+      as.data.frame(readRDS(paste0("simulation_files/beocat/tradbayesresults_sim", i, "_500_4n.rds"))) %>%
+        mutate(sim_id = i, iter = 1:N_sims))
+}
+
+```
+
+
+```{r}
+bayesresults_calib_4n <- bayesresults_4n %>% 
+  mutate(a1_calibrated = ifelse(A1_p025 < A1.true & A1_p975 > A1.true, "yes", "no")) %>% 
+  mutate(a2_calibrated = ifelse(A2_p025 < A2.true & A2_p975 > A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_mean)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+no_yes)/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("param", NA))
+```
+
+
+```{r}
+final_results_4n <-
+  bayesresults_4n %>% transmute(A1 = A1_mean, A2 = A2_mean, sim_id, iter, method = "Bayesian") %>% 
+  bind_rows(
+    readRDS("simulation_files/results_4n_500_05182022.rds") %>%
+      rownames_to_column("iter") %>%
+      pivot_longer(cols = A1_sim1:A2_sim9) %>%
+      separate("name", c("par", "sim_id")) %>%
+      mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+      pivot_wider(names_from = "par", values_from = "value") %>% 
+      mutate(method = "MLE")
+  )
+```
+
+
+```{r}
+final_uncertainty_4n <-
+  bayesresults_4n %>%
+  transmute(A1_width = A1_p975 - A1_p025, A2_width = A2_p975 - A2_p025, sim_id, iter, method = "Bayesian") %>% 
+  bind_rows(
+    readRDS("simulation_files/uncertainty_4n_500_05182022.rds") %>%
+      rownames_to_column("iter") %>%
+      pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>%
+      separate("name", c("par","extreme", "sim_id")) %>%
+      mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+      pivot_wider(names_from = c("par", "extreme"), values_from = "value") %>%
+      transmute(iter, sim_id, A1_width = A1_ub - A1_lb, A2_width = A2_ub - A2_lb) %>% 
+      mutate(method = "MLE")
+  )
+```
+
+```{r}
+masterlist_filt <- list()
+for (i in 1:9) {
+  masterlist_filt[[i]] <- readRDS(paste0("simulation_files/beocat/sim",i, "_filtered_4n.rds"))
+}
+
+rows <- rep(c(48, 96, 192), 3) ## Number of rows for the complete dataframes with N = 4/ N = 8/ N = 16.  
+
+missingdata_histograms_4n <- matrix(nrow = N_sims, ncol = 9)
+
+for (i in 1:9) {
+  missingdata_histograms_4n[,i] <- lapply(masterlist_filt[[i]], function(x) {1- (nrow(x)/rows[i])}[1]) %>%
+    bind_cols() %>%
+    pivot_longer(cols = everything()) %>% pull(value) #%>% hist(main = i, breaks = 40)
+}
+
+colnames(missingdata_histograms_4n) <- c("sim_1", "sim_2", "sim_3", "sim_4", "sim_5", "sim_6", "sim_7", "sim_8", "sim_9")
+missingdf_4n <- missingdata_histograms_4n %>% colMeans() %>%  as.data.frame() %>% 
+  rename(missing = ".") %>% 
+  rownames_to_column("sim_id") %>%
+  mutate(sim_id = substr(sim_id, 5,5) %>% as.numeric())
+
+```
+
+
+```{r}
+final_results_4n %>% 
+  left_join(missingdf_4n) %>% 
+  group_by(method, sim_id, missing) %>% 
+  nest() %>% 
+  summarise(A1 = data %>% map_dbl(~metrica::PBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+         A2 = data %>% map_dbl(~metrica::PBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>%
+  ungroup() %>% 
+  pivot_longer(cols = c(A1, A2)) %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  ggplot(aes(missing, value))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(N~name, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Percentage Bias Error (%)",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+ggsave("output/figures/PBE2_4n_05222022.tiff", width = 6, height = 5)
+```
+
+
+```{r}
+mleresults_calib_4n <- readRDS("simulation_files/uncertainty_4n_500_05182022.rds") %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  na.omit(value) %>% 
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(no_yes), 0, no_yes))/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+```{r}
+bayesresults_calib_4n %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib_4n %>% mutate(method = "MLE") %>% rename(param = parameter)
+  ) %>% left_join(
+    missingdf_4n , by = "sim_id") %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 4", "N = 8", "N = 16"))) %>% 
+  unite("methodN", c(method, N), remove = F) %>% 
+  ggplot(aes(missing, calib))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(N~param, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Coverage Probability",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+ggsave("output/figures/CP_4n_05222022.tiff", width = 6, height = 5)
+```
+
+```{r}
+masterlist_filt <- list()
+for (i in 1:9) {
+  masterlist_filt[[i]] <- readRDS(paste0("simulation_files/beocat/sim",i, "_filtered_3n.rds"))
+}
+
+rows <- rep(c(36, 72, 144), 3) ## Number of rows for the complete dataframes with N = 4/ N = 8/ N = 16.  
+
+missingdata_histograms_3n <- matrix(nrow = N_sims, ncol = 9)
+
+for (i in 1:9) {
+  missingdata_histograms_3n[,i] <- lapply(masterlist_filt[[i]], function(x) {1- (nrow(x)/rows[i])}[1]) %>%
+    bind_cols() %>%
+    pivot_longer(cols = everything()) %>% pull(value) #%>% hist(main = i, breaks = 40)
+}
+
+colnames(missingdata_histograms_3n) <- c("sim_1", "sim_2", "sim_3", "sim_4", "sim_5", "sim_6", "sim_7", "sim_8", "sim_9")
+missingdf_3n <- missingdata_histograms_3n %>% colMeans() %>%  as.data.frame() %>% 
+  rename(missing = ".") %>% 
+  rownames_to_column("sim_id") %>%
+  mutate(sim_id = substr(sim_id, 5,5) %>% as.numeric())
+
+```
+
+```{r}
+final_results_3n <-
+  bayesresults_3n %>% transmute(A1 = A1_mean, A2 = A2_mean, sim_id, iter, method = "Bayesian") %>% 
+  bind_rows(
+    readRDS("simulation_files/results_3n_500_05182022.rds") %>%
+      rownames_to_column("iter") %>%
+      pivot_longer(cols = A1_sim1:A2_sim9) %>%
+      separate("name", c("par", "sim_id")) %>%
+      mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+      pivot_wider(names_from = "par", values_from = "value") %>% 
+      mutate(method = "MLE")
+  )
+
+```
+
+```{r}
+bayesresults_5n <- data.frame()
+
+for (i in 1:9) {
+  bayesresults_5n <- bayesresults_5n %>% 
+    bind_rows(
+      as.data.frame(readRDS(paste0("simulation_files/beocat/tradbayesresults_sim", i, "_500.rds"))) %>%
+        mutate(sim_id = i, iter = 1:N_sims))
+}
+
+```
+
+
+```{r}
+final_results_5n <-
+  bayesresults_5n %>% transmute(A1 = A1_mean, A2 = A2_mean, sim_id, iter, method = "Bayesian") %>% 
+  bind_rows(
+    readRDS("simulation_files/results_500_05162022.rds") %>%
+      rownames_to_column("iter") %>%
+      pivot_longer(cols = A1_sim1:A2_sim9) %>%
+      separate("name", c("par", "sim_id")) %>%
+      mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+      pivot_wider(names_from = "par", values_from = "value") %>% 
+      mutate(method = "MLE")
+  )
+
+```
+
+```{r}
+masterlist_filt <- list()
+for (i in 1:9) {
+  masterlist_filt[[i]] <- readRDS(paste0("simulation_files/beocat/sim",i, "_filtered.rds"))
+}
+
+rows <- rep(c(60, 120, 240), 3) ## Number of rows for the complete dataframes with N = 4/ N = 8/ N = 16.  
+
+missingdata_histograms_5n <- matrix(nrow = N_sims, ncol = 9)
+
+for (i in 1:9) {
+  missingdata_histograms_5n[,i] <- lapply(masterlist_filt[[i]], function(x) {1- (nrow(x)/rows[i])}[1]) %>%
+    bind_cols() %>%
+    pivot_longer(cols = everything()) %>% pull(value) #%>% hist(main = i, breaks = 40)
+}
+
+colnames(missingdata_histograms_5n) <- c("sim_1", "sim_2", "sim_3", "sim_4", "sim_5", "sim_6", "sim_7", "sim_8", "sim_9")
+missingdf_5n <- missingdata_histograms_5n %>% colMeans() %>%  as.data.frame() %>% 
+  rename(missing = ".") %>% 
+  rownames_to_column("sim_id") %>%
+  mutate(sim_id = substr(sim_id, 5,5) %>% as.numeric())
+```
+
+```{r}
+mleresults_calib_5n <- readRDS("simulation_files/uncertainty_500_05162022.rds") %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  na.omit(value) %>% 
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(no_yes), 0, no_yes))/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+
+```{r}
+bayesresults_calib_5n <- bayesresults_5n %>% 
+  mutate(a1_calibrated = ifelse(A1_p025 < A1.true & A1_p975 > A1.true, "yes", "no")) %>% 
+  mutate(a2_calibrated = ifelse(A2_p025 < A2.true & A2_p975 > A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_mean)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+no_yes)/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("param", NA))
+```
+# 3 + 4 + 5  
+
+
+```{r}
+final_results_4n %>% 
+  left_join(missingdf_4n) %>% 
+  group_by(method, sim_id, missing) %>% 
+  nest() %>% 
+  summarise(A1 = data %>% map_dbl(~metrica::PBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+         A2 = data %>% map_dbl(~metrica::PBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>%
+  ungroup() %>% 
+  pivot_longer(cols = c(A1, A2)) %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 4", "N = 8", "N = 16"))) %>%
+  mutate(nrates  = 4) %>% 
+  bind_rows(
+    final_results_5n %>%
+      left_join(missingdf_5n) %>%
+      group_by(method, sim_id, missing) %>%
+      nest() %>%
+      summarise(A1 = data %>% map_dbl(~metrica::PBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+                A2 = data %>% map_dbl(~metrica::PBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>%
+      ungroup() %>%
+      pivot_longer(cols = c(A1, A2)) %>%
+      mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 4", "N = 8", "N = 16"))) %>% mutate(nrates  = 5)) %>%
+  bind_rows(
+     final_results_3n %>%
+      left_join(missingdf_3n) %>%
+      group_by(method, sim_id, missing) %>%
+      nest() %>%
+      summarise(A1 = data %>% map_dbl(~metrica::PBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+                A2 = data %>% map_dbl(~metrica::PBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>%
+      ungroup() %>%
+      pivot_longer(cols = c(A1, A2)) %>%
+      mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 4", "N = 8", "N = 16"))) %>% mutate(nrates  = 3)) %>% 
+  ungroup() %>% 
+  unite(nr, c("method", "nrates"), remove = F) %>% 
+  ggplot(aes(missing, value))+
+  geom_line(aes(group = nr, color = method, linetype = factor(nrates)))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(N~name, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Percentage Bias Error (%)",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method",
+       linetype = "Amount of N rates")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+ggsave("output/figures/PBE2_345n_05222022.tiff", width = 6, height = 5)
+```
+
+### CP  
+
+```{r}
+bayesresults_calib_3n <- bayesresults_3n %>% 
+  mutate(a1_calibrated = ifelse(A1_p025 < A1.true & A1_p975 > A1.true, "yes", "no")) %>% 
+  mutate(a2_calibrated = ifelse(A2_p025 < A2.true & A2_p975 > A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_mean)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+ifelse(is.na(no_yes), 0, no_yes))/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("param", NA))
+```
+
+
+```{r}
+mleresults_calib_3n <- readRDS("simulation_files/uncertainty_3n_500_05182022.rds") %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  na.omit(value) %>% 
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (ifelse(is.na(yes_yes), 0, yes_yes)+ifelse(is.na(no_yes), 0, no_yes))/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+```{r}
+bayesresults_calib_4n %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib_4n %>% mutate(method = "MLE") %>% rename(param = parameter)
+  ) %>% left_join(
+    missingdf_4n , by = "sim_id") %>%
+  mutate(nrates = 4) %>% 
+  bind_rows(bayesresults_calib_3n %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib_3n %>% mutate(method = "MLE") %>% rename(param = parameter)
+    ) %>% left_join(
+      missingdf_3n , by = "sim_id") %>% mutate(nrates = 3)
+      ) %>% 
+  bind_rows(bayesresults_calib_5n %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib_5n %>% mutate(method = "MLE") %>% rename(param = parameter)
+    ) %>% left_join(
+      missingdf_5n , by = "sim_id") %>% mutate(nrates = 5)
+      ) %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 4", "N = 8", "N = 16"))) %>% 
+  unite(nr, c("method", "nrates"), remove = F) %>% 
+  ggplot(aes(missing, calib))+
+  geom_line(aes(group = nr, color = method, linetype = factor(nrates)))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(N~param, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Coverage Probability",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method",
+       linetype = "Amount of N rates")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+ggsave("output/figures/CP_345n_05222022.tiff", width = 6, height = 5)
+```
+
+
+```{r}
+bayesresults_calib_4n %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib_4n %>% mutate(method = "MLE") %>% rename(param = parameter)
+  ) %>% left_join(
+    missingdf_4n , by = "sim_id") %>%
+  mutate(nrates = 4) %>% 
+  bind_rows(bayesresults_calib_3n %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib_3n %>% mutate(method = "MLE") %>% rename(param = parameter)
+    ) %>% left_join(
+      missingdf_3n , by = "sim_id") %>% mutate(nrates = 3)
+      ) %>% 
+  bind_rows(bayesresults_calib_5n %>% mutate(method = "Bayes") %>% bind_rows(
+    mleresults_calib_5n %>% mutate(method = "MLE") %>% rename(param = parameter)
+    ) %>% left_join(
+      missingdf_5n , by = "sim_id") %>% mutate(nrates = 5)
+      ) %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 4", "N = 8", "N = 16"))) %>% 
+  unite(nr, c("method", "nrates"), remove = F) %>% 
+  ggplot(aes(missing, calib))+
+  geom_line(aes(group = nr, color = method, linetype = factor(nrates)))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(N~param, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Coverage Probability",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method",
+       linetype = "Amount of N rates")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+ggsave("output/figures/CIeff_345n_05222022.tiff", width = 6, height = 5)
+```
+
+# 3 N rates  
+
+
+### Simulate dilutions  
+```{r sim dilutions}
+N_sims <- 1000
+Nrates <- 3
+set.seed(42)
+## 1. n1 obs, 0% missing plateaus
+sim1 <- list()
+
+for (i in 1:N_sims) {
+  sim1[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                        N_nrates = Nrates, N_reps = 3,
+                        Bmax_v = (Bmax_v[-remove1])[ss1_1[i,]],
+                        s_v = (s_v[-remove1])[ss1_1[i,]],
+                        Nstart_v = (Nstart_v[-remove1])[ss1_1[i,]],
+                        sy_v = factor(1:n1),
+                        var = FALSE,
+                        Nact_ul = .45)
+}
+
+## 1. n2 obs, 0% missing plateaus
+
+sim2 <- list()
+for (i in 1:N_sims) {
+  sim2[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = (Bmax_v[-remove1])[ss2_1[i,]],
+                 s_v = (s_v[-remove1])[ss2_1[i,]], 
+                 Nstart_v = (Nstart_v[-remove1])[ss2_1[i,]], 
+                 sy_v = factor(1:n2),
+                 var = FALSE,
+                 Nact_ul = 0.35)
+  }
+
+
+
+## 3. n3 obs, 0% missing plateaus
+sim3 <- list()
+for (i in 1:N_sims) {
+  sim3[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = (Bmax_v[-remove1])[ss3_1[i,]],
+                 s_v = (s_v[-remove1])[ss3_1[i,]], 
+                 Nstart_v = (Nstart_v[-remove1])[ss3_1[i,]], 
+                 sy_v = factor(1:n3),
+                 var = FALSE,
+                 Nact_ul = 0.35)
+  }
+
+
+
+## 4. n1 obs, 33% missing plateaus (.25)
+sim4 <- list()
+for(i in 1:N_sims){
+sim4[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss1[i,]],
+                 s_v = s_v[ss1[i,]], 
+                 Nstart_v = Nstart_v[ss1[i,]], 
+                 sy_v = factor(1:n1),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 5. n2 obs, 33% missing plateaus (.25)
+sim5 <- list()
+for(i in 1:N_sims){
+sim5[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss2[i,]],
+                 s_v = s_v[ss2[i,]], 
+                 Nstart_v = Nstart_v[ss2[i,]], 
+                 sy_v = factor(1:n2),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 6. n3 obs, 33% missing plateaus
+sim6 <- list()
+for(i in 1:N_sims){
+sim6[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss3[i,]],
+                 s_v = s_v[ss3[i,]], 
+                 Nstart_v = Nstart_v[ss3[i,]], 
+                 sy_v = factor(1:n3),
+                 var = TRUE,
+                 Nact_ul = .35)
+}
+
+## 7. n1 obs, 66% missing plateaus
+sim7 <- list()
+for(i in 1:N_sims) {
+sim7[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss1[i,]],
+                 s_v = s_v[ss1[i,]], 
+                 Nstart_v = Nstart_v[ss1[i,]], 
+                 sy_v = factor(1:n1),
+                 var = TRUE,
+                 Nact_ul = .0965)
+}
+
+## 5. n2 obs, 33% missing plateaus (.25)
+sim8 <- list()
+for(i in 1:N_sims) {
+sim8[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss2[i,]],
+                 s_v = s_v[ss2[i,]], 
+                 Nstart_v = Nstart_v[ss2[i,]], 
+                 sy_v = factor(1:n2),
+                 var = TRUE,
+                 Nact_ul = .09)
+}
+
+## 9. n3 obs, 66% missing plateaus (.25)
+sim9 <- list()
+
+for(i in 1:N_sims) {
+sim9[[i]] <- dilution(A1 = A1.true, A2 = A2.true,
+                 N_nrates = Nrates, N_reps = 3,
+                 Bmax_v = Bmax_v[ss3[i,]],
+                 s_v = s_v[ss3[i,]], 
+                 Nstart_v = Nstart_v[ss3[i,]], 
+                 sy_v = factor(1:n3),
+                 var = TRUE,
+                 Nact_ul = .09)
+}
+```
+
+```{r}
+lapply(sim7[1:10],
+       function(x) {x %>% 
+  ggplot(aes(W, Nact))+
+  geom_segment(aes(y = Nstart, yend = Nc, x = Wstart, xend = Wend, group = sampling),
+               linetype = 2, alpha = .7, color = "grey35")+
+  geom_segment(aes(y = Nc, yend = Nc+.6, x = Wend, xend = Wend), linetype = 2, alpha = .7, color = "grey35")+
+  geom_point(aes(color = sy), show.legend = F)+
+  geom_line(aes(x = Wmax, y = Nc))+
+           theme(aspect.ratio = .8)+
+  stat_function(fun = function(x){3.5*x^(-.35)}, 
+                linetype = 2,
+                color = "tomato")})        
+```
+
+### Fit Linear-plateau  
+
+```{r fake N_sims, eval=TRUE, include=FALSE}
+N_sims <- 500
+```
+
+```{r map linear-plateau, message = FALSE, warning=FALSE, eval=FALSE}
+a <- list()
+for (i in 1:N_sims){
+  a[[i]] <- lapply(list(sim1[[i]], sim2[[i]], sim3[[i]], sim4[[i]], sim5[[i]], sim6[[i]], sim7[[i]], sim8[[i]], sim9[[i]]),
+                   map_lp)
+}
+```
+
+```{r}
+# a %>% saveRDS("a_500_4nrates_05172022.rds")
+# a %>% saveRDS("a_500_3nrates_05172022.rds")
+N_sims <- 500
+# a <- readRDS("a_500_4nrates_05172022.rds")
+# a <- readRDS("a_500_3nrates_05172022.rds")
+```
+
+
+```{r plateaus yes-no}
+plateaus <- list()
+
+for (i in 1:N_sims){
+  plateaus[[i]] <- lapply(a[[1]],
+                   function(x) {spot_nulls(x) %>% as.numeric() })
+}
+```
+
+
+#### Check that the nr of missing plateaus is approx correct  
+
+```{r check missing perc}
+missing <- data.frame(
+  sim1 = numeric(N_sims),
+  sim2 = numeric(N_sims),
+  sim3 = numeric(N_sims),
+  sim4 = numeric(N_sims),
+  sim5 = numeric(N_sims),
+  sim6 = numeric(N_sims),
+  sim7 = numeric(N_sims),
+  sim8 = numeric(N_sims),
+  sim9 = numeric(N_sims))
+
+for (i in 1:N_sims) {
+  tryCatch({
+    missing[i, 1] <- mean(plateaus[[i]][[1]])
+    missing[i, 2] <- mean(plateaus[[i]][[2]])
+    missing[i, 3] <- mean(plateaus[[i]][[3]])
+    missing[i, 4] <- mean(plateaus[[i]][[4]])
+    missing[i, 5] <- mean(plateaus[[i]][[5]])
+    missing[i, 6] <- mean(plateaus[[i]][[6]])
+    missing[i, 7] <- mean(plateaus[[i]][[7]])
+    missing[i, 8] <- mean(plateaus[[i]][[8]])
+    missing[i, 9] <- mean(plateaus[[i]][[9]])},
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+  if(skip_to_next) { next }
+}
+
+missing %>% summarise_at(vars(sim1:sim9), funs(mean))
+```
+
+### Final dataframe   
+
+```{r final_df, message=FALSE, warning=FALSE, eval=FALSE, include=TRUE}
+final_df <- list()
+for (i in 1:N_sims){
+final_df[[i]] <-  sim1[[i]] %>% 
+  left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[1]]) %>%
+              mutate(sy = id %>% as.factor(),
+                     sim_id = 1,
+                     nl_nc = get_nc_fromlist(a[[i]][[1]]),
+                     nl_wmax = get_wmax_fromlist(a[[i]][[1]]))) %>% 
+  left_join(compare_aic(dataframe = sim1[[i]], nl_list = a[[i]][[1]]) %>% dplyr::select(sy, recomm)) %>% 
+  bind_rows(sim2[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[2]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 2,
+                                        nl_nc = get_nc_fromlist(a[[i]][[2]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[2]]))) %>% 
+              left_join(compare_aic(dataframe = sim2[[i]], nl_list = a[[i]][[2]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim3[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[3]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 3,
+                                        nl_nc = get_nc_fromlist(a[[i]][[3]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[3]]))) %>% 
+              left_join(compare_aic(dataframe = sim3[[i]], nl_list = a[[i]][[3]]) %>% dplyr::select(sy, recomm))) %>%
+  bind_rows(sim4[[i]] %>% left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[4]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 4,
+                                        nl_nc = get_nc_fromlist(a[[i]][[4]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[4]]))) %>% 
+              left_join(compare_aic(dataframe = sim4[[i]], nl_list = a[[i]][[4]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim5[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[5]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 5,
+                                        nl_nc = get_nc_fromlist(a[[i]][[5]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[5]]))) %>% 
+              left_join(compare_aic(dataframe = sim5[[i]], nl_list = a[[i]][[5]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim6[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[6]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 6,
+                                        nl_nc = get_nc_fromlist(a[[i]][[6]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[6]]))) %>% 
+              left_join(compare_aic(dataframe = sim6[[i]], nl_list = a[[i]][[6]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim7[[i]] %>% left_join(data.frame(id = 1:n1, nulls = plateaus[[i]][[7]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 7,
+                                        nl_nc = get_nc_fromlist(a[[i]][[7]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[7]]))) %>% 
+              left_join(compare_aic(dataframe = sim7[[i]], nl_list = a[[i]][[7]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim8[[i]] %>% left_join(data.frame(id = 1:n2, nulls = plateaus[[i]][[8]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 8,
+                                        nl_nc = get_nc_fromlist(a[[i]][[8]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[8]]))) %>% 
+              left_join(compare_aic(dataframe = sim8[[i]], nl_list = a[[i]][[8]]) %>% dplyr::select(sy, recomm))) %>% 
+  bind_rows(sim9[[i]] %>% left_join(data.frame(id = 1:n3, nulls = plateaus[[i]][[9]]) %>%
+                                 mutate(sy = id %>% as.factor(),
+                                        sim_id = 9,
+                                        nl_nc = get_nc_fromlist(a[[i]][[9]]),
+                                        nl_wmax = get_wmax_fromlist(a[[i]][[9]]))) %>% 
+              left_join(compare_aic(dataframe = sim9[[i]], nl_list = a[[i]][[9]]) %>% dplyr::select(sy, recomm))) %>% 
+  mutate(sampling = as.factor(sampling), 
+         nl_nc = ifelse(nl_nc == 0 , NA, nl_nc),
+         nl_wmax = ifelse(nl_wmax == 0 , NA, nl_wmax))
+}
+```
+
+```{r}
+# final_df  <-  readRDS("final_df_4n_0516.rds")
+final_df %>% saveRDS("final_df_3n_0516.rds")
+```
+#### Clean final DF  
+
+```{r clean df}
+final_df_clean <- lapply(final_df, function(x) {
+  x %>% filter(recomm == "nl")
+})
+```
+
+Check the amount of missing plateaus  
+
+
+```{r recomm loop}
+recomm_nl <- lapply(final_df_clean, function(x) {
+  lapply(split(x, x$sim_id),
+         function(x) {
+           n_distinct(x$sampling)
+           })
+  }) %>% bind_rows()
+
+recomm_nl %>% colMeans(na.rm = T) %>% as.data.frame() %>% 
+  rownames_to_column("sim_id") %>% 
+  pivot_wider(names_from = "sim_id", values_from = ".") %>% 
+  transmute(recomm_nl1 = 1-(`1`/4),
+            recomm_nl2 = 1-(`2`/8),
+            recomm_nl3 = 1-(`3`/16),
+            recomm_nl4 = 1-(`4`/4),
+            recomm_nl5 = 1-(`5`/8),
+            recomm_nl6 = 1-(`6`/16),
+            recomm_nl7 = 1-(`7`/4),
+            recomm_nl8 = 1-(`8`/8),
+            recomm_nl9 = 1-(`9`/16))
+```
+
+Divide into sim*_filtered (each list includes all the filtered dataframes from sim1, sim2, ... sim9)  
+
+```{r filter sims}
+#create objects to store the data
+sim1_filtered <- list()
+sim2_filtered <- list()
+sim3_filtered <- list()
+sim4_filtered <- list()
+sim5_filtered <- list()
+sim6_filtered <- list()
+sim7_filtered <- list()
+sim8_filtered <- list()
+sim9_filtered <- list()
+
+for (i in 1:N_sims) {
+  sim1_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 1 )
+  sim2_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 2 )
+  sim3_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 3 )
+  sim4_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 4 )
+  sim5_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 5 )
+  sim6_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 6 )
+  sim7_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 7 )
+  sim8_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 8 )
+  sim9_filtered[[i]] <- final_df_clean[[i]] %>% filter(sim_id == 9 )
+
+}
+```
+
+
+```{r histogram}
+masterlist_filt <- list(sim1_filtered, sim2_filtered, sim3_filtered, sim4_filtered, 
+                        sim5_filtered, sim6_filtered, sim7_filtered, sim8_filtered, sim9_filtered)
+
+rows <- rep(c(60, 120, 240), 3) ## Number of rows for the complete dataframes with N = 4/ N = 8/ N = 16.  
+
+missingdata_histograms <- matrix(nrow = N_sims, ncol = 9)
+
+for (i in 1:9) {
+  missingdata_histograms[,i] <- lapply(masterlist_filt[[i]], function(x) {1- (nrow(x)/rows[i])}[1]) %>%
+    bind_cols() %>%
+    pivot_longer(cols = everything()) %>% pull(value) #%>% hist(main = i, breaks = 40)
+}
+
+colnames(missingdata_histograms) <- c("sim 1", "sim 2", "sim 3", "sim 4", "sim 5", "sim 6", "sim 7", "sim 8", "sim 9")
+
+missingdata_histograms %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything()) %>% 
+  mutate(vline = case_when(name %in% c("sim 1", "sim 2", "sim 3") ~ .10,
+                           name %in% c("sim 4", "sim 5", "sim 6") ~ .33,
+                           name %in% c("sim 7", "sim 8", "sim 9") ~ .66)) %>% 
+  ggplot(aes(value))+
+  geom_histogram(bins =40)+
+  geom_vline(aes(xintercept = vline), linetype = 2, color = "gold")+
+  facet_wrap(~name)+
+  theme_bw()+
+  theme(aspect.ratio = .7,
+        panel.grid = element_blank()) -> missingdata_histograms_plot
+```
+
+```{r final histogram}
+table_descript$Samplings.NOT.reaching.Wmax....
+plottext <- table_descript %>% 
+  transmute(name = paste0("sim ", ID),
+            missing = `Samplings.NOT.reaching.Wmax....`,
+            n_sampl = Samplings)
+
+missingdata_histograms %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything()) %>% 
+  mutate(vline = case_when(name %in% c("sim 1", "sim 2", "sim 3") ~ .10,
+                           name %in% c("sim 4", "sim 5", "sim 6") ~ .4,
+                           name %in% c("sim 7", "sim 8", "sim 9") ~ .7)) 
+
+missingdata_histograms_plot+
+  geom_text(x = .7, y = 600, aes(label = paste0("N = ", n_sampl, "\n ", missing, "% missing ")), data = plottext)+
+  theme_minimal()+
+  theme(plot.background = element_rect(fill = "white"))
+
+ggsave("../../output/figures/supplementary1_3n_05162022.tiff", width = 5, height = 7)
+```
+
+
+### Fit to a NL model  
+#### Fit everything:  
+```{r fit, message=FALSE, warning=FALSE}
+fits <- lapply(final_df_clean,
+               function(x) {
+                 df <- x
+                 v <- list()
+                 for (i in 1:9) {
+                   tryCatch({
+                     v[[i]] <- nls(nl_nc ~ A1 * nl_wmax^(-A2),
+                                   start = list(A1 = A1.true, A2 = A2.true),
+                                   data = df %>% filter(sim_id ==i) %>% 
+                                   dplyr::select(nl_nc, nl_wmax) %>% unique())    },
+                     error = function(e) {})
+                   
+                   if(skip_to_next) { next }
+                   }
+                 return(v)
+       })
+```
+
+#### Check point estimates  
+
+Get the coefficients:   
+```{r get a1 a2}
+coefs_a1 <- list()
+coefs_a2 <- list()
+for (i in 1:N_sims) {
+  coefs_a1[[i]] <- lapply(fits[[i]], function(x) {coef(x)[1]})
+  coefs_a2[[i]] <- lapply(fits[[i]], function(x) {coef(x)[2]})
+}
+```
+
+
+Merge it into a dataframe:  
+```{r res dataframe}
+results_3n <- data.frame(A1_sim1 = numeric(N_sims),
+                      A1_sim2 = numeric(N_sims),
+                      A1_sim3 = numeric(N_sims),
+                      A1_sim4 = numeric(N_sims),
+                      A1_sim5 = numeric(N_sims),
+                      A1_sim6 = numeric(N_sims),
+                      A1_sim7 = numeric(N_sims),
+                      A1_sim8 = numeric(N_sims),
+                      A1_sim9 = numeric(N_sims),
+                      A2_sim1 = numeric(N_sims),
+                      A2_sim2 = numeric(N_sims),
+                      A2_sim3 = numeric(N_sims),
+                      A2_sim4 = numeric(N_sims),
+                      A2_sim5 = numeric(N_sims),
+                      A2_sim6 = numeric(N_sims),
+                      A2_sim7 = numeric(N_sims),
+                      A2_sim8 = numeric(N_sims),
+                      A2_sim9 = numeric(N_sims) )
+
+for (i in 1:N_sims) {
+  for (k in 1:9) {
+    
+  tryCatch({
+    results_3n[i, k] <- coefs_a1[[i]][[k]]
+    results_3n[i, 9+k] <- coefs_a2[[i]][[k]]
+    },
+    error = function(e) {})
+  if(skip_to_next) { next }
+  }
+}
+head(results_3n)
+```
+
+Visualize the results:  
+```{r PE viz 1}
+results_3n %>% 
+  pivot_longer(cols = everything()) %>% 
+  separate(name, c("parameter", "simulation_id")) %>%
+  filter(value!=0) %>% 
+  ggplot(aes(value))+
+  geom_histogram(bins = 80)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')
+```
+
+#### Check confidence intervals:  
+```{r CIs dataframe, message=FALSE, warning=FALSE}
+# create the space
+uncertainty_3n <- data.frame(
+  A1_lb_sim1 = numeric(N_sims),
+  A1_lb_sim2 = numeric(N_sims),
+  A1_lb_sim3 = numeric(N_sims),
+  A1_lb_sim4 = numeric(N_sims),
+  A1_lb_sim5 = numeric(N_sims),
+  A1_lb_sim6 = numeric(N_sims),
+  A1_lb_sim7 = numeric(N_sims),
+  A1_lb_sim8 = numeric(N_sims),
+  A1_lb_sim9 = numeric(N_sims),
+  A1_ub_sim1 = numeric(N_sims),
+  A1_ub_sim2 = numeric(N_sims),
+  A1_ub_sim3 = numeric(N_sims),
+  A1_ub_sim4 = numeric(N_sims),
+  A1_ub_sim5 = numeric(N_sims),
+  A1_ub_sim6 = numeric(N_sims),
+  A1_ub_sim7 = numeric(N_sims),
+  A1_ub_sim8 = numeric(N_sims),
+  A1_ub_sim9 = numeric(N_sims),
+  A2_lb_sim1 = numeric(N_sims),
+  A2_lb_sim2 = numeric(N_sims),
+  A2_lb_sim3 = numeric(N_sims),
+  A2_lb_sim4 = numeric(N_sims),
+  A2_lb_sim5 = numeric(N_sims),
+  A2_lb_sim6 = numeric(N_sims),
+  A2_lb_sim7 = numeric(N_sims),
+  A2_lb_sim8 = numeric(N_sims),
+  A2_lb_sim9 = numeric(N_sims),
+  A2_ub_sim1 = numeric(N_sims),
+  A2_ub_sim2 = numeric(N_sims),
+  A2_ub_sim3 = numeric(N_sims),
+  A2_ub_sim4 = numeric(N_sims),
+  A2_ub_sim5 = numeric(N_sims),
+  A2_ub_sim6 = numeric(N_sims),
+  A2_ub_sim7 = numeric(N_sims),
+  A2_ub_sim8 = numeric(N_sims),
+  A2_ub_sim9 = numeric(N_sims))
+
+
+for (i in 1:N_sims) {
+  for (k in 1:9) {
+    
+  tryCatch({
+    confints <- confint(fits[[i]][[k]])
+    uncertainty_3n[i, k] <- confints[1] 
+    uncertainty_3n[i, k+9] <- confints[3] 
+    uncertainty_3n[i, k+18] <- confints[2] 
+    uncertainty_3n[i, k+27] <- confints[4] 
+    },
+    error = function(e) {})
+  if(skip_to_next) { next }
+  }
+}
+
+```
+
+Visual check:  
+```{r viz CIs}
+uncertainty_3n %>% 
+  mutate(iter = 1:nrow(uncertainty_3n)) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "simulation_id")) %>%
+  filter(value!=0) %>%
+  pivot_wider(names_from = "extreme", values_from = "value") %>% 
+  ggplot(aes(lb, iter))+
+  geom_errorbarh(aes(xmin = lb, xmax = ub, 
+                     color = ifelse(parameter =="A1",
+                                    ifelse(lb<A1.true & ub>A1.true, "within", "outside"),
+                                    ifelse(lb<A2.true & ub> A2.true, "within", "outside"))),
+                 height = 0)+
+  geom_vline(aes(xintercept = ifelse(parameter =="A1", A1.true, A2.true)), linetype = 2)+
+  facet_grid(simulation_id~parameter, scales = 'free')+  
+  labs(color = "P.E. within/outside C.I.",
+       x = "", 
+       y = "iteration")
+```
+
+### Save this  1/2 (N_sims x) iteration as RDS  
+
+```{r save, eval=FALSE, include=FALSE}
+saveRDS(results_3n, "simulation_files/results_3n_500_05182022.rds")
+saveRDS(uncertainty_3n, "simulation_files/uncertainty_3n_500_05182022.rds")
+saveRDS(final_df, "simulation_files/final_df_500_3n_05182022.rds")
+saveRDS(final_df_clean, "simulation_files/final_df_clean_500_3n_05182022.rds")
+```
+
+
+
+```{r}
+missingdf <- missingdata_histograms %>% colMeans() %>%  as.data.frame() %>% 
+  rename(missing = ".") %>% 
+  rownames_to_column("sim_id") %>%
+  mutate(sim_id = substr(sim_id, 5,5) %>% as.numeric())
+```
+
+```{r bias pbe}
+bind_rows(results %>%
+            rownames_to_column("iter") %>%
+            pivot_longer(cols = A1_sim1:A2_sim9) %>%
+            separate("name", c("par", "sim_id")) %>%
+            mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+            pivot_wider(names_from = "par", values_from = "value") %>%
+            mutate(method = "MLE - 5n"),
+          results_3n %>%
+            rownames_to_column("iter") %>%
+            pivot_longer(cols = A1_sim1:A2_sim9) %>%
+            separate("name", c("par", "sim_id")) %>%
+            mutate(sim_id = substr(sim_id, 4, 4) %>% as.numeric(),
+             iter = as.numeric(iter)) %>%
+            pivot_wider(names_from = "par", values_from = "value") %>%
+            mutate(method = "MLE - 3n")) %>% 
+  left_join(missingdf) %>% 
+  group_by(method, sim_id, missing) %>% 
+  nest() %>% 
+  summarise(A1 = data %>% map_dbl(~metrica::PBE(obs = .$A1, pred = rep(A1.true, length(.$A1)))),
+         A2 = data %>% map_dbl(~metrica::PBE(obs = .$A2, pred = rep(A2.true, length(.$A2))))) %>%
+  ungroup() %>% 
+  pivot_longer(cols = c(A1, A2)) %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  ggplot(aes(missing, value))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(name~N, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Percentage Bias Error (%)",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+```
+
+```{r}
+mleresults_3n_calib <- uncertainty_3n[1:500, ] %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+no_yes)/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+```{r}
+
+mleresults_5n_calib <- readRDS("simulation_files/uncertainty_500_05162022.rds")[1:500, ] %>% 
+  mutate(iter = 1:500) %>% 
+  pivot_longer(cols = A1_lb_sim1:A2_ub_sim9) %>% 
+  separate(name, c("parameter", "extreme", "sim_id")) %>%
+  mutate(sim_id=substr(sim_id, 4, 4) %>%as.numeric()) %>% 
+  filter(value!=0) %>%
+  pivot_wider(names_from = c("parameter", "extreme"), values_from = "value") %>% 
+  mutate(a1_calibrated = ifelse(A1_lb<A1.true & A1_ub>A1.true, "yes", "no"),
+         a2_calibrated = ifelse(A2_lb<A2.true & A2_ub> A2.true, "yes", "no")) %>% 
+  group_by(sim_id, a1_calibrated, a2_calibrated) %>% 
+  summarise(n = length(A1_lb)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = n, names_from = c(a1_calibrated, a2_calibrated)) %>% 
+  mutate(A1_calib = (yes_yes+ifelse(is.na(yes_no), 0, yes_no))/N_sims,
+         A2_calib = (yes_yes+no_yes)/N_sims) %>%
+  dplyr::select(sim_id, A1_calib, A2_calib) %>% 
+  pivot_longer(cols = -sim_id, values_to = "calib") %>% 
+  separate(name, c("parameter", NA))
+```
+
+```{r}
+mleresults_4n_calib %>% mutate(method = "MLE - 4n") %>% rename(param = parameter) %>% bind_rows(
+    mleresults_5n_calib %>%
+      mutate(method = "MLE - 5n") %>% rename(param = parameter)
+  ) %>% left_join(
+    missingdf , by = "sim_id") %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  unite("methodN", c(method, N), remove = F) %>% 
+  ggplot(aes(missing, calib))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(param~N, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Coverage Probability",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+
+```
+
+
+```{r}
+mleresults_3n_calib %>% 
+  mutate(method = "MLE - 4n") %>%
+  rename(param = parameter) %>% 
+  bind_rows(
+    mleresults_5n_calib %>%
+      mutate(method = "MLE - 5n") %>% rename(param = parameter)
+  ) %>% left_join(
+    missingdf , by = "sim_id") %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 16", "N = 8", "N = 4"))) %>% 
+  unite("methodN", c(method, N), remove = F) %>% 
+  ggplot(aes(missing, calib))+
+  geom_line(aes(group = method, color = method))+
+  geom_point(aes(color = method), alpha =.7)+
+  facet_grid(param~N, scales = 'free')+
+  theme_pubclean()+
+  theme(aspect.ratio = .75,
+        legend.position = "bottom")+
+  labs(y = "Coverage Probability",
+       x = "Missing plateaus (% of samplings)", 
+       color = "Method")+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  theme(strip.background = element_rect(fill = NA))
+
+```
+
+```{r}
+bayesresults_3n <- data.frame()
+
+for (i in 1:9) {
+  bayesresults_3n <- bayesresults_3n %>% 
+    bind_rows(
+      as.data.frame(readRDS(paste0("simulation_files/beocat/tradbayesresults_sim", i, "_500_3n.rds"))) %>%
+        mutate(sim_id = i, iter = 1:N_sims))
+}
+
+
+```
+
+
+

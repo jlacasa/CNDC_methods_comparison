@@ -1,0 +1,1280 @@
+---
+title: "1-maize_rice_CNDC"
+author: "J Lacasa"
+date: "8/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries  
+```{r libs, message=FALSE, warning=FALSE}
+library(tidyverse) # data wrangling
+library(mosaic) # bootstrap
+library(ggpubr) # prepare figures for publication
+
+# For the Bayesian analysis:  
+library(rjags)
+library(coda)
+```
+
+# Maize  
+## Data    
+
+```{r}
+url <- "https://ndownloader.figstatic.com/files/34498346" # Get the most recent version of the dataset (https://doi.org/10.6084/m9.figshare.19105049.v1) 
+
+f <- read.csv(url) 
+f <- f %>%
+  rename(N = Npred., W = W_ton_ha) %>% 
+  filter(Species == "Maize" & !is.na(Sampling_time)& !is.na(W)  & !(is.na(N))) %>%
+  unite("sy", c(Sites, Year), sep="_", remove = FALSE) %>%
+  filter(W>1) %>% 
+  mutate(samp_id = as.numeric(as.factor(paste(Species, "_", sy, "_", Sampling_time, sep=""))),
+         Species_n = as.numeric(as.factor(as.character(Species))),
+         Paper = Paper %>% as.character() %>% as.factor(),
+         Nact = N,
+         Nc = 2.7, 
+         s = -6,
+         Bmax = 3,
+         sampling = samp_id)
+
+unique(f$Paper)
+```
+
+```{r dilutions}
+g <- f %>% filter(Paper == "Zhao et al. (2018)")
+```
+
+
+```{r}
+# A function to visualize the data
+visualize_start <- function(x, title) {
+  x %>% 
+    ggplot(aes(N, W))+
+    geom_point()+
+    labs(title = title)
+}
+```
+
+```{r}
+g %>% 
+  arrange(samp_id) %>% 
+  group_by(samp_id) %>% 
+  nest() %>% 
+  mutate(plot = pmap(.l = list(data, samp_id),
+                     .f = ~visualize_start(..1,..2))) %>% 
+  pull(plot)
+```
+
+```{r}
+g_parts <- split(g, g$samp_id)
+save_sampid <- (g %>% arrange(samp_id))$samp_id %>% unique()
+```
+
+```{r}
+fits_casestudy <- data.frame(nl_wmax = numeric(10),
+                             nl_s = numeric(10),
+                             nl_nc = numeric(10),
+                             samp_id = save_sampid)
+
+
+f1 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[1]],
+        start = list(Bmax = 2,
+                     s = 8,
+                     Nc = 3))
+
+AIC(f1);AIC(lm(W~N, data = g_parts[[1]]))
+# 
+# f2 <- nls(W ~ ifelse(N>Nc,
+#                Bmax,
+#                Bmax - ((Nc - N)*s)),
+#         data = g_parts[[2]],
+#         start = list(Bmax = 3.5,
+#                      s = 12,
+#                      Nc = 2.5))
+# 
+# AIC(f2);AIC(lm(W~N, data = g_parts[[2]]))
+
+
+f3 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[3]],
+        start = list(Bmax = 3.5,
+                     s = 12,
+                     Nc = 2.5))
+AIC(f3);AIC(lm(W~N, data = g_parts[[3]]))
+
+
+f4 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[4]],
+        start = list(Bmax = 3.5,
+                     s = 12,
+                     Nc = 2))
+AIC(f4);AIC(lm(W~N, data = g_parts[[4]]))
+
+
+f5 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[5]],
+        start = list(Bmax = 3.5,
+                     s = 12,
+                     Nc = 1.9))
+AIC(f5);AIC(lm(W~N, data = g_parts[[5]]))
+
+f6 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[6]],
+        start = list(Bmax = 2,
+                     s = 12,
+                     Nc = 2.8))
+AIC(f6);AIC(lm(W~N, data = g_parts[[6]]))
+
+# 
+# f7 <- nls(W ~ ifelse(N>Nc,
+#                Bmax,
+#                Bmax - ((Nc - N)*s)),
+#         data = g_parts[[7]],
+#         start = list(Bmax = 2,
+#                      s = 16,
+#                      Nc = 2.1),
+#     control = list(minFactor = .001,
+#                    maxiter = 10000))
+
+
+f8 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[8]],
+        start = list(Bmax = 3.5,
+                     s = 12,
+                     Nc = 2.2))
+AIC(f8);AIC(lm(W~N, data = g_parts[[8]]))
+
+
+f9 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[9]],
+        start = list(Bmax = 3.5,
+                     s = 12,
+                     Nc = 2.2))
+AIC(f9);AIC(lm(W~N, data = g_parts[[9]]))
+
+
+f10 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[10]],
+        start = list(Bmax = 8,
+                     s = 8,
+                     Nc = 2))
+AIC(f10);AIC(lm(W~N, data = g_parts[[10]]))
+
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+for (i in 1:3){ fits_casestudy[1,i] <- coef(f1)[[i]] }
+# for (i in 1:3){ fits_casestudy[2,i] <- coef(f2)[[i]] }
+for (i in 1:3){ fits_casestudy[3,i] <- coef(f3)[[i]] }
+for (i in 1:3){ fits_casestudy[4,i] <- coef(f4)[[i]] }
+for (i in 1:3){ fits_casestudy[5,i] <- coef(f5)[[i]] }
+for (i in 1:3){ fits_casestudy[6,i] <- coef(f6)[[i]] }
+# for (i in 1:3){ fits_casestudy[7,i] <- coef(f7)[[i]] }
+for (i in 1:3){ fits_casestudy[8,i] <- coef(f8)[[i]] }
+for (i in 1:3){ fits_casestudy[9,i] <- coef(f9)[[i]] }
+for (i in 1:3){ fits_casestudy[10,i] <- coef(f10)[[i]] }
+
+
+fits_casestudy$nl_wmax[which(fits_casestudy$nl_wmax == 0)] <- NA
+fits_casestudy$nl_s[which(fits_casestudy$nl_s == 0)] <- NA
+fits_casestudy$nl_nc[which(fits_casestudy$nl_nc == 0)] <- NA
+```
+
+```{r}
+fits_casestudy %>% 
+  ggplot(aes(nl_wmax, nl_nc))+
+  geom_point()
+```
+
+```{r}
+finalfit <- nls(nl_nc~ A1*nl_wmax^(-A2),
+    data = fits_casestudy,
+    start = list(A1 = 3.5, A2 = .4))
+coef(finalfit)
+confint(finalfit)
+```
+
+## El momento de la verdad  
+
+
+```{r}
+library(rjags)
+library(coda)
+
+g <- g %>% filter(samp_id %in% save_sampid[-c(2, 7)]) %>% 
+  mutate(samp_id2 = samp_id %>% as.character() %>% as.factor() %>% as.numeric() )
+
+set.seed(567)
+model<-jags.model('rjags/modelstring.txt',
+                  data=list('W' = g$W, 'N' = g$N, 'Date' = g$samp_id2,
+                            'Q' = nrow(g), 'K' = n_distinct(g$samp_id2)),
+                  n.chains=3, n.adapt=1000)
+
+update(model, n.iter=1000)
+
+samples_casestudy <- coda.samples(model, variable.names=c("A1","A2"), n.iter=100000, thin=10)
+samples_casestudy_plot <- coda.samples(model, variable.names=c("Bmax","S", "Nc"), n.iter=100000, thin=10)
+```
+
+```{r}
+samples_casestudy_maize <- samples_casestudy 
+samples_casestudy_plot_maize <- samples_casestudy_plot 
+
+```
+
+```{r}
+as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>% as.data.frame() %>%
+  summarise(A1_p025 = quantile(A1, probs = .025),
+            A1_p975 = quantile(A1, probs = .975),
+            A2_p025 = quantile(A2, probs = .025),
+            A2_p975 = quantile(A2, probs = .975))
+```
+
+## Results  
+```{r}
+bayesresults_casestudy <- as.matrix(samples_casestudy_maize[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy_maize[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy_maize[[3]])) %>% colMeans()
+bayesresults_casestudy_plot <- as.matrix(samples_casestudy_plot_maize[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy_plot_maize[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy_plot_maize[[3]])) %>% colMeans()
+
+bayesresults_casestudy_plot <- 
+  bayesresults_casestudy_plot %>%
+  as.data.frame() %>% 
+  rownames_to_column("par") %>% 
+  separate(par, c("par", "samp_id2")) %>% 
+  rename(est = ".") %>% 
+  pivot_wider(names_from = "par", values_from = "est") %>% 
+  mutate(samp_id2 = samp_id2 %>% as.numeric())
+
+bayesresults_casestudy_plot <- bayesresults_casestudy_plot %>%
+  rename(bayes_bmax = Bmax, bayes_s = S)
+
+bayesresults_casestudy_plot <- bayesresults_casestudy_plot %>% left_join(g %>% dplyr::select(bayes_nc =Nc, samp_id, samp_id2) %>% unique())
+```
+
+## Plots  
+```{r}
+box1a <- as.matrix(samples_casestudy_maize[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy_maize[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy_maize[[3]])) %>%
+  as.data.frame() %>% 
+  mutate(iter = 1:30000) %>% 
+  pivot_longer(cols = -iter) %>% 
+  ggplot(aes(value))+
+  geom_histogram(fill = wesanderson::wes_palette("Darjeeling1")[1], alpha =.45)+
+  facet_wrap(~name, scales = 'free')+
+  theme_pubclean()+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  geom_errorbarh(aes(xmin = ifelse(name == "A1", confint(finalfit)[[1]], confint(finalfit)[[2]]),
+                     xmax = ifelse(name == "A1", confint(finalfit)[[3]], confint(finalfit)[[4]]), y = 0),
+                 color = wesanderson::wes_palette("Darjeeling1")[2],
+                 alpha =.75)+
+  geom_point(aes(x = ifelse(name == "A1", coef(finalfit)[[1]], coef(finalfit)[[2]]), y = 0),
+             color = wesanderson::wes_palette("Darjeeling1")[2],
+             alpha =.75)+
+  theme(aspect.ratio = 1)+
+  scale_x_continuous(breaks= scales::pretty_breaks(n=5))
+# ggsave("output/figures/casestudy_box1a.tiff", width = 6, height = 3.5)
+```
+
+```{r}
+g %>%  
+  left_join(fits_casestudy_maize) %>% 
+  left_join(bayesresults_casestudy_plot_maize) %>% 
+  mutate(filter = ifelse(is.na(nl_wmax), "removed", "included")) %>% 
+  group_by(samp_id) %>% 
+  mutate(Nstart = min(N), Nend = max(N), Wstart = min(W)) %>% 
+  ungroup() %>% 
+  filter(filter == "included") %>% 
+  mutate(method = c(rep(c("Sequential framework", "Hierarchical framework"), each = 34), "Hierarchical framework")) %>% 
+  pull(nl_nc) %>% unique()
+
+```
+
+
+```{r}
+curve.plot_maize <- g %>%  
+  left_join(fits_casestudy_maize) %>% 
+  left_join(bayesresults_casestudy_plot_maize) %>% 
+  mutate(filter = ifelse(is.na(nl_wmax), "removed", "included")) %>% 
+  group_by(samp_id) %>% 
+  mutate(Nstart = min(N), Nend = max(N), Wstart = min(W)) %>% 
+  ungroup() %>% 
+  filter(filter == "included") %>% 
+  mutate(method = c(rep(c("Sequential framework", "Hierarchical framework"), each = 34), "Hierarchical framework")) %>% 
+  ggplot(aes(W, N))+
+  geom_point(aes(fill = method, color = method), shape =21)+
+  geom_point(color = "grey15", show.legend = FALSE)+
+  stat_function(fun = function(x){coef(finalfit)[[1]] * x ^(-coef(finalfit)[[2]])}, linetype =2, color = wesanderson::wes_palette("Darjeeling1")[2])+
+  stat_function(fun = function(x){3.1475285 * x ^(- 0.2531488)}, color = wesanderson::wes_palette("Darjeeling1")[1])+
+  geom_segment(aes(y = Nstart , yend = nl_nc, x = nl_wmax + nl_s*(Nstart-nl_nc), xend = nl_wmax, group = factor(samp_id)),
+               show.legend = FALSE, color = wesanderson::wes_palette("Darjeeling1")[2],
+               linetype = 2, alpha = .6)+
+  geom_segment(aes(y = nl_nc, yend = nl_nc+1, show.legend = FALSE, x = nl_wmax, xend = nl_wmax),color = wesanderson::wes_palette("Darjeeling1")[2],
+               linetype = 2, alpha = .6)+
+  
+  geom_segment(aes(y = Nstart , yend = 3.1475285 * bayes_bmax ^(- 0.2531488), 
+                   x = bayes_bmax + bayes_s*(Nstart-(3.1475285 * bayes_bmax ^(- 0.2531488))), xend = bayes_bmax, 
+                   group = factor(samp_id)), 
+               color = wesanderson::wes_palette("Darjeeling1")[1], show.legend = FALSE, linetype = 1, alpha = .4)+
+  geom_segment(aes(y = 3.1475285 * bayes_bmax ^(- 0.2531488), yend = 3.1475285 * bayes_bmax ^(- 0.2531488)+1,
+                   show.legend = FALSE, x = bayes_bmax, xend = bayes_bmax),color =wesanderson::wes_palette("Darjeeling1")[1],  linetype = 1, alpha = .4)+
+  theme_pubclean()+
+  theme(aspect.ratio = .68)+
+  labs(fill = "", color = "")+
+  scale_fill_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))
+curve.plot_maize
+# ggsave("output/figures/box1b_casestudy.tiff", width = 6, height = 3.5)
+```
+
+```{r}
+box1 <- ggarrange(box1a+theme(legend.position = "none")+
+                    theme(strip.background = element_rect(fill = NA, color = NA),
+                          strip.text = element_text(face = "bold"),
+                          axis.title.y = element_blank())+
+                    scale_x_continuous(breaks = scales::breaks_extended(4))+  
+                    scale_color_manual(values = wesanderson::wes_palette("Darjeeling1")),
+          box1b,
+          labels = c("A", "B"),
+          ncol =2,
+          common.legend = TRUE,
+          align = "hv")
+# ggsave("output/figures/box1arranged2_casestudy_05212022.tiff", box1, width = 8, height = 3.5)
+```
+
+
+### N recomm sensitivity  
+
+```{r}
+diff.plot_maize <- data.frame(W = seq(from = 1.5, to = 10, length.out = 100)) %>% 
+  mutate(Nc_Sequential = coef(finalfit)[[1]] * W ^(-coef(finalfit)[[2]]),
+         Nc_Hierarchical = 3.1475285 * (W^(- 0.2531488)),
+         NNI_Sequential = 1/Nc_Sequential,
+         NNI_Hierarchical = 1/Nc_Hierarchical) %>% 
+  dplyr::select(W, Nc_Sequential:NNI_Hierarchical) %>% 
+  pivot_longer(cols = c(Nc_Sequential, Nc_Hierarchical, NNI_Sequential, NNI_Hierarchical)) %>% 
+  separate(name, c("trait", "framework")) %>% 
+  pivot_wider(names_from = "framework", values_from = "value") %>%
+  mutate(y = ifelse(trait == "Nc", (Sequential-Hierarchical)*.01*(W*1000), Sequential-Hierarchical)) %>% 
+  filter(trait == "Nc") %>%
+  ggplot(aes(W, y))+
+  geom_ribbon(aes(ymin = 0, ymax = y),
+              data = . %>% filter(y>0), fill = wesanderson::wes_palette("Darjeeling1")[2], alpha=.3)+
+  geom_ribbon(aes(ymin = y, ymax = 0),
+              data = . %>% filter(y<=0), fill = wesanderson::wes_palette("Darjeeling1")[1], alpha=.3)+
+  # geom_text(label = "sequential > hierarchical", x = 1.6, y = 0.1, vjust = "bottom", hjust = "left")+
+  # geom_text(label = "sequential < hierarchical", x = 3.8, y = -2, hjust = "left", vjust = "bottom")+
+  geom_line()+
+  labs(x = expression(Biomass~(Mg~ha^{-1})), 
+       y = expression(Difference~`in`~N~requirements~(kg~ha^-1)))+
+  theme_pubclean()+
+  theme(aspect.ratio = 1)+
+  labs(fill = "Method", color = "Method")+
+  scale_fill_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"));diff.plot_maize
+# ggsave("output/figures/applied_casestudy.tiff", width = 6, height = 4)
+```
+
+
+```{r}
+fig2 <- ggarrange(ggarrange(box1b+theme(legend.position = "none")+theme(plot.margin = unit(c(1,1,1,1), "lines")),
+                  box1a+theme(legend.position = "none")+
+                    theme(strip.background = element_rect(fill = NA, color = NA),
+                          strip.text = element_text(face = "bold"),
+                          axis.title.y = element_blank())+
+                    scale_x_continuous(breaks = scales::breaks_extended(4))+  
+                    scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+                    theme(plot.margin = unit(c(1,1,1,1), "lines")),
+          labels = c("A", "B"),
+          ncol =1,
+          heights = c(1.5,1),
+          align = "hv"),
+          fig2c+theme(plot.margin = unit(c(1,1,1,1), "lines")),
+          ncol = 2,
+          common.legend = TRUE,
+          labels = c(NA, "C"))
+ggsave("output/figures/fig2_07032022b.tiff", fig2, width = 7.75, height = 3.5)
+```
+
+```{r}
+f_maize <- f
+g_maize <- g
+finalfit_maize <- finalfit
+samples_casestudy_maize <- samples_casestudy
+samples_casestudy_plot_maize <- samples_casestudy_plot
+bayesresults_casestudy_maize <- bayesresults_casestudy
+bayesresults_casestudy_plot_maize <- bayesresults_casestudy_plot
+fits_casestudy_maize <- fits_casestudy
+```
+
+# Wheat  
+## Data    
+
+```{r dilutions}
+f <- read.csv("~/Documents/PhD/projects/3 - N_database/data/NNI_dataset.csv") %>%
+  rename(N = Npred., W = W_ton_ha) %>% 
+  filter(Species == "Wheat" & !is.na(Sampling_time)& !is.na(W)  & !(is.na(N))) %>%
+  unite("sy", c(Sites, Year), sep="_", remove = FALSE) %>%
+  filter(W>1) %>% 
+  mutate(samp_id = as.numeric(as.factor(paste(Species, "_", sy, "_", Sampling_time, sep=""))),
+         Species_n = as.numeric(as.factor(as.character(Species))),
+         Paper = Paper %>% as.character() %>% as.factor(),
+         Nact = N,
+         Nc = 2.7, 
+         s = -6,
+         Bmax = 3,
+         sampling = samp_id)
+
+unique(f$Paper)
+```
+
+```{r dilutions}
+g <- f %>%
+  filter(Paper == "Ziadi et al. (2010)")
+```
+
+
+```{r}
+visualize_start <- function(x, title) {
+  x %>% 
+    ggplot(aes(N, W))+
+    geom_point()+
+    labs(title = title)
+}
+
+g %>% 
+  arrange(samp_id) %>% 
+  group_by(samp_id) %>% 
+  nest() %>% 
+  mutate(plot = pmap(.l = list(data, samp_id),
+                     .f = ~visualize_start(..1,..2))) %>% 
+  pull(plot)
+```
+
+```{r}
+g_parts <- split(g, g$samp_id)
+save_sampid <- (g %>% arrange(samp_id))$samp_id %>% unique()
+```
+
+```{r}
+fits_casestudy <- data.frame(nl_wmax = numeric(length(save_sampid)),
+                             nl_s = numeric(length(save_sampid)),
+                             nl_nc = numeric(length(save_sampid)),
+                             samp_id = save_sampid)
+
+
+# f1 <- nls(W ~ ifelse(N>Nc,
+#                Bmax,
+#                Bmax - ((Nc - N)*s)),
+#         data = g_parts[[1]],
+#         start = list(Bmax = 4,
+#                      s = 2,
+#                      Nc = 4.5))
+# 
+# AIC(f1);AIC(lm(W~N, data = g_parts[[1]]))
+
+
+f2 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[2]],
+        start = list(Bmax = 3,
+                     s = 1,
+                     Nc = 3))
+
+AIC(f2);AIC(lm(W~N, data = g_parts[[2]]))
+
+
+# f3 <- nls(W ~ ifelse(N>Nc,
+#                Bmax,
+#                Bmax - ((Nc - N)*s)),
+#         data = g_parts[[3]],
+#         start = list(Bmax = 4.4,
+#                      s = 7,
+#                      Nc = 1), 
+#         control = list(minFactor = .00000000000000000001,
+#                        tol = 1e-10,
+#                        warnOnly = TRUE))
+# 
+# AIC(f3);AIC(lm(W~N, data = g_parts[[3]]))
+
+
+# f4 <- nls(W ~ ifelse(N>Nc,
+#                Bmax,
+#                Bmax - ((Nc - N)*s)),
+#         data = g_parts[[4]],
+#         start = list(Bmax = 10,
+#                      s = 10,
+#                      Nc = 2.3), 
+#         control = list(minFactor = .00000000000000000001,
+#                        tol = 1e-10,
+#                        warnOnly = TRUE))
+# AIC(f4);AIC(lm(W~N, data = g_parts[[4]]))
+
+
+f5 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[5]],
+        start = list(Bmax = 5,
+                     s = 7,
+                     Nc = 1.2), 
+        control = list(minFactor = .00000000000000000001,
+                       tol = 1e-10,
+                       warnOnly = TRUE))
+AIC(f5);AIC(lm(W~N, data = g_parts[[5]]))
+
+f6 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[6]],
+        start = list(Bmax = 5,
+                     s = 7,
+                     Nc = 1.2),
+        control = list(minFactor = .00000000000000000001,
+                       tol = 1e-10,
+                       warnOnly = TRUE))
+AIC(f6);AIC(lm(W~N, data = g_parts[[6]]))
+
+
+# f7 <- nls(W ~ ifelse(N>Nc,
+#                Bmax,
+#                Bmax - ((Nc - N)*s)),
+#         data = g_parts[[7]],
+#         start = list(Bmax = 4.5,
+#                      s = 7,
+#                      Nc = 2))
+# AIC(f7);AIC(lm(W~N, data = g_parts[[7]]))
+# 
+
+f8 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[7]],
+        start = list(Bmax = 4.5,
+                     s = 7,
+                     Nc = 2))
+AIC(f8);AIC(lm(W~N, data = g_parts[[8]]))
+
+f7 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[7]],
+        start = list(Bmax = 4.5,
+                     s = 7,
+                     Nc = 2))
+AIC(f7);AIC(lm(W~N, data = g_parts[[7]]))
+
+f7 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[7]],
+        start = list(Bmax = 4.5,
+                     s = 7,
+                     Nc = 2))
+AIC(f7);AIC(lm(W~N, data = g_parts[[7]]))
+
+f7 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[7]],
+        start = list(Bmax = 4.5,
+                     s = 7,
+                     Nc = 2))
+AIC(f7);AIC(lm(W~N, data = g_parts[[7]]))
+
+f7 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[7]],
+        start = list(Bmax = 4.5,
+                     s = 7,
+                     Nc = 2))
+AIC(f7);AIC(lm(W~N, data = g_parts[[7]]))
+
+f7 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[7]],
+        start = list(Bmax = 4.5,
+                     s = 7,
+                     Nc = 2))
+AIC(f7);AIC(lm(W~N, data = g_parts[[7]]))
+
+
+```
+
+
+```{r}
+# for (i in 1:3){ fits_casestudy[1,i] <- coef(f1)[[i]] }
+for (i in 1:3){ fits_casestudy[2,i] <- coef(f2)[[i]] }
+for (i in 1:3){ fits_casestudy[3,i] <- coef(f3)[[i]] }
+for (i in 1:3){ fits_casestudy[4,i] <- coef(f4)[[i]] }
+for (i in 1:3){ fits_casestudy[5,i] <- coef(f5)[[i]] }
+# for (i in 1:3){ fits_casestudy[6,i] <- coef(f6)[[i]] }
+for (i in 1:3){ fits_casestudy[7,i] <- coef(f7)[[i]] }
+
+fits_casestudy$nl_wmax[which(fits_casestudy$nl_wmax == 0)] <- NA
+fits_casestudy$nl_s[which(fits_casestudy$nl_s == 0)] <- NA
+fits_casestudy$nl_nc[which(fits_casestudy$nl_nc == 0)] <- NA
+```
+
+```{r}
+fits_casestudy %>% 
+  ggplot(aes(nl_wmax, nl_nc))+
+  geom_point()
+```
+
+```{r}
+finalfit <- nls(nl_nc~ A1*nl_wmax^(-A2),
+    data = fits_casestudy,
+    start = list(A1 = 3.5, A2 = .4))
+coef(finalfit)
+confint(finalfit)
+```
+
+```{r}
+hist(fits_casestudy$nl_wmax)
+```
+
+## Bayes  
+
+```{r}
+wheat_model <- "
+model {
+for (i in 1:Q)
+{
+W[i]~dnorm(mu[i], tau_b)
+N[i]~dnorm(Nc[Date[i]], tau_n)
+mu[i]<-min(Bmax[Date[i]], Bmax[Date[i]]+S[Date[i]]*(N[i]-Nc[Date[i]]))
+}
+for (j in 1:K)
+{
+Nc[j]=A1*Bmax[j]^(-A2)
+Bmax[j]~dnorm(Mu_Bmax,Prec_Bmax)T(0,)
+S[j]~dnorm(Mu_S,Prec_S)T(0,)
+}
+
+Mu_Bmax~dnorm(8,0.1)
+Mu_S~dnorm(0,0.1)
+A1~dunif(2,8)
+A2~dunif(0,0.9)
+Prec_Bmax~dgamma(0.001,0.001)
+Prec_S~dgamma(0.001,0.001) 
+tau_b~dgamma(0.001,0.001)
+tau_n~dgamma(0.001,0.001)
+}
+"
+writeLines(wheat_model, "rjags/modelstring_wheat.txt")
+```
+
+```{r}
+library(rjags)
+library(coda)
+
+g <- g %>% filter(samp_id %in% save_sampid[-c(1, 6)]) %>% 
+  mutate(samp_id2 = samp_id %>% as.character() %>% as.factor() %>% as.numeric() )
+
+set.seed(567)
+model<-jags.model('rjags/modelstring_wheat.txt',
+                  data=list('W' = g$W, 'N' = g$N, 'Date' = g$samp_id2,
+                            'Q' = nrow(g), 'K' = n_distinct(g$samp_id2)),
+                  n.chains=3, n.adapt=1000)
+
+update(model, n.iter=1000)
+
+samples_casestudy <- coda.samples(model, variable.names=c("A1","A2"), n.iter=100000, thin=10)
+samples_casestudy_plot <- coda.samples(model, variable.names=c("Bmax","S"), n.iter=100000, thin=10)
+```
+
+
+```{r}
+as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>% as.data.frame() %>%
+  summarise(A1_p025 = quantile(A1, probs = .025),
+            A1_p975 = quantile(A1, probs = .975),
+            A2_p025 = quantile(A2, probs = .025),
+            A2_p975 = quantile(A2, probs = .975))
+```
+
+```{r}
+as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>% as.data.frame() %>%
+  summarise(A1_p025 = quantile(A1, probs = .025),
+            A1_p975 = quantile(A1, probs = .975),
+            A2_p025 = quantile(A2, probs = .025),
+            A2_p975 = quantile(A2, probs = .975))
+```
+
+
+```{r}
+bayesresults_casestudy <- as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>% colMeans()
+bayesresults_casestudy_plot <- as.matrix(samples_casestudy_plot[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy_plot[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy_plot[[3]])) %>% colMeans()
+
+bayesresults_casestudy_plot <- 
+  bayesresults_casestudy_plot %>%
+  as.data.frame() %>% 
+  rownames_to_column("par") %>% 
+  separate(par, c("par", "samp_id2")) %>% 
+  rename(est = ".") %>% 
+  pivot_wider(names_from = "par", values_from = "est") %>% 
+  mutate(samp_id2 = samp_id2 %>% as.numeric())
+
+bayesresults_casestudy_plot <- bayesresults_casestudy_plot %>%
+  rename(bayes_bmax = Bmax, bayes_s = S)
+
+bayesresults_casestudy_plot <- bayesresults_casestudy_plot %>% left_join(g %>% dplyr::select(samp_id, samp_id2) %>% unique())
+```
+
+```{r}
+box1a <- as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>%
+  as.data.frame() %>% 
+  mutate(iter = 1:30000) %>% 
+  pivot_longer(cols = -iter) %>% 
+  ggplot(aes(value))+
+  geom_histogram(fill = wesanderson::wes_palette("Darjeeling1")[1], alpha =.45)+
+  facet_wrap(~name, scales = 'free')+
+  theme_pubclean()+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  geom_errorbarh(aes(xmin = ifelse(name == "A1", confint(finalfit)[[1]], confint(finalfit)[[2]]),
+                     xmax = ifelse(name == "A1", confint(finalfit)[[3]], confint(finalfit)[[4]]), y = 0),
+                 color = wesanderson::wes_palette("Darjeeling1")[2],
+                 alpha =.75)+
+  geom_point(aes(x = ifelse(name == "A1", coef(finalfit)[[1]], coef(finalfit)[[2]]), y = 0),
+             color = wesanderson::wes_palette("Darjeeling1")[2],
+             alpha =.75)+
+  theme(aspect.ratio = 1)+
+  scale_x_continuous(breaks= scales::pretty_breaks(n=5))
+# ggsave("output/figures/casestudy_box1a.tiff", width = 6, height = 3.5)
+```
+
+
+```{r}
+box1b <- g %>%  
+  left_join(fits_casestudy) %>% 
+  left_join(bayesresults_casestudy_plot) %>% 
+  mutate(filter = ifelse(is.na(nl_wmax), "removed", "included")) %>% 
+  group_by(samp_id) %>% 
+  mutate(Nstart = min(N), Nend = max(N), Wstart = min(W)) %>% 
+  ungroup() %>% 
+  filter(filter == "included") %>% 
+  mutate(method = c(rep(c("Sequential framework", "Hierarchical framework"), each = 34), "Hierarchical framework")) %>% 
+  ggplot(aes(W, N))+
+  geom_point(aes(fill = method, color = method), shape =21)+
+  geom_point(color = "grey15", show.legend = FALSE)+
+  stat_function(fun = function(x){coef(finalfit)[[1]] * x ^(-coef(finalfit)[[2]])}, linetype =2, color = wesanderson::wes_palette("Darjeeling1")[2])+
+  stat_function(fun = function(x){3.1475285 * x ^(- 0.2531488)}, color = wesanderson::wes_palette("Darjeeling1")[1])+
+  geom_segment(aes(y = Nstart , yend = nl_nc, x = nl_wmax + nl_s*(Nstart-nl_nc), xend = nl_wmax, group = factor(samp_id)),
+               show.legend = FALSE, color = wesanderson::wes_palette("Darjeeling1")[2],
+               linetype = 2, alpha = .6)+
+  geom_segment(aes(y = nl_nc, yend = nl_nc+1, show.legend = FALSE, x = nl_wmax, xend = nl_wmax),color = wesanderson::wes_palette("Darjeeling1")[2],
+               linetype = 2, alpha = .6)+
+  
+  geom_segment(aes(y = Nstart , yend = 3.1475285 * bayes_bmax ^(- 0.2531488), 
+                   x = bayes_bmax + bayes_s*(Nstart-(3.1475285 * bayes_bmax ^(- 0.2531488))), xend = bayes_bmax, 
+                   group = factor(samp_id)), 
+               color = wesanderson::wes_palette("Darjeeling1")[1], show.legend = FALSE, linetype = 1, alpha = .4)+
+  geom_segment(aes(y = 3.1475285 * bayes_bmax ^(- 0.2531488), yend = 3.1475285 * bayes_bmax ^(- 0.2531488)+1,
+                   show.legend = FALSE, x = bayes_bmax, xend = bayes_bmax),color =wesanderson::wes_palette("Darjeeling1")[1],  linetype = 1, alpha = .4)+
+  theme_pubclean()+
+  theme(aspect.ratio = .68)+
+  labs(fill = "", color = "")+
+  scale_fill_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))
+
+ggsave("output/figures/box1b_casestudy.tiff", width = 6, height = 3.5)
+```
+```{r}
+
+```
+
+
+# Rice  
+
+##Data  
+```{r dilutions}
+f <- read.csv("~/Documents/PhD/projects/3 - N_database/data/NNI_dataset.csv") %>%
+  rename(N = Npred., W = W_ton_ha) %>% 
+  filter(Species == "Rice" & !is.na(Sampling_time)& !is.na(W)  & !(is.na(N))) %>%
+  unite("sy", c(Sites, Year), sep="_", remove = FALSE) %>%
+  filter(W>1) %>% 
+  mutate(samp_id = as.numeric(as.factor(paste(Species, "_", sy, "_", Sampling_time, sep=""))),
+         Species_n = as.numeric(as.factor(as.character(Species))),
+         Paper = Paper %>% as.character() %>% as.factor(),
+         Nact = N,
+         Nc = 2.7, 
+         s = -6,
+         Bmax = 3,
+         sampling = samp_id)
+
+unique(f$Paper)
+```
+
+```{r dilutions}
+g <- f %>%
+  filter(Paper == "Yao et al. (2021)")
+```
+
+
+```{r}
+visualize_start <- function(x, title) {
+  x %>% 
+    ggplot(aes(N, W))+
+    geom_point()+
+    labs(title = title)
+}
+
+g %>% 
+  arrange(samp_id) %>% 
+  group_by(samp_id) %>% 
+  nest() %>% 
+  mutate(plot = pmap(.l = list(data, samp_id),
+                     .f = ~visualize_start(..1,..2))) %>% 
+  pull(plot)
+```
+
+```{r}
+g_parts <- split(g, g$samp_id)
+save_sampid <- (g %>% arrange(samp_id))$samp_id %>% unique()
+```
+
+## Fit  
+### Sequential  
+
+```{r}
+### Esto sirve para ata ul karim
+fits_casestudy <- data.frame(nl_wmax = numeric(length(save_sampid)),
+                             nl_s = numeric(length(save_sampid)),
+                             nl_nc = numeric(length(save_sampid)),
+                             samp_id = save_sampid)
+
+
+f1 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[1]],
+        start = list(Bmax = 2,
+                     s = 2,
+                     Nc = 2.8))
+
+AIC(f1);AIC(lm(W~N, data = g_parts[[1]]))
+
+
+f2 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[2]],
+        start = list(Bmax = 8,
+                     s = 4,
+                     Nc = 2))
+
+AIC(f2);AIC(lm(W~N, data = g_parts[[2]]))
+
+
+f3 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[3]],
+        start = list(Bmax = 12,
+                     s = 4,
+                     Nc = 1.6))
+
+AIC(f3);AIC(lm(W~N, data = g_parts[[3]]))
+
+
+f4 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[4]],
+        start = list(Bmax = 14,
+                     s = 5,
+                     Nc = 1.3))
+AIC(f4);AIC(lm(W~N, data = g_parts[[4]]))
+
+
+f5 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[5]],
+        start = list(Bmax = 20,
+                     s = 15,
+                     Nc = 1.1),
+        control = list(minFactor = .00000000000000000001,
+                       tol = 1e-10,
+                       warnOnly = TRUE))
+
+AIC(f5);AIC(lm(W~N, data = g_parts[[5]]))
+
+f6 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[6]],
+        start = list(Bmax = 2.8,
+                     s = 7,
+                     Nc = 2.5),
+        control = list(minFactor = .00000000000000000001,
+                       tol = 1e-10,
+                       warnOnly = TRUE))
+AIC(f6);AIC(lm(W~N, data = g_parts[[6]]))
+
+
+f7 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[7]],
+        start = list(Bmax = 5.5,
+                     s = 10,
+                     Nc = 1.9),
+        control = list(minFactor = .00000000000000000001,
+                       tol = 1e-10,
+                       warnOnly = TRUE))
+AIC(f7);AIC(lm(W~N, data = g_parts[[7]]))
+
+
+f8 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[8]],
+        start = list(Bmax = 8,
+                     s = 10,
+                     Nc = 1.3),
+        control = list(minFactor = .00000000000000000001,
+                       tol = 1e-10,
+                       warnOnly = TRUE))
+AIC(f8);AIC(lm(W~N, data = g_parts[[8]]))
+
+# f9 <- nls(W ~ ifelse(N>Nc,
+#                Bmax,
+#                Bmax - ((Nc - N)*s)),
+#         data = g_parts[[9]],
+#         start = list(Bmax = 13.5,
+#                      s = 9,
+#                      Nc = 1.1),
+#         control = list(minFactor = .00000000000000000001,
+#                        tol = 1e-10,
+#                        maxiter = 1000,
+#                        warnOnly = TRUE))
+# AIC(f9);AIC(lm(W~N, data = g_parts[[9]]))
+
+f10 <- nls(W ~ ifelse(N>Nc,
+               Bmax,
+               Bmax - ((Nc - N)*s)),
+        data = g_parts[[10]],
+        start = list(Bmax = 20,
+                     s = 10.2,
+                     Nc = 1.2),
+        control = list(minFactor = .00000000000000000001,
+                       tol = 1e-10,
+                       maxiter = 100,
+                       warnOnly = TRUE))
+AIC(f10);AIC(lm(W~N, data = g_parts[[10]]))
+```
+
+2, 6, 8, 9
+
+```{r}
+for (i in 1:3){ fits_casestudy[1,i] <- coef(f1)[[i]] }
+# for (i in 1:3){ fits_casestudy[2,i] <- coef(f2)[[i]] }
+for (i in 1:3){ fits_casestudy[3,i] <- coef(f3)[[i]] }
+for (i in 1:3){ fits_casestudy[4,i] <- coef(f4)[[i]] }
+for (i in 1:3){ fits_casestudy[5,i] <- coef(f5)[[i]] }
+# for (i in 1:3){ fits_casestudy[6,i] <- coef(f6)[[i]] }
+for (i in 1:3){ fits_casestudy[7,i] <- coef(f7)[[i]] }
+# for (i in 1:3){ fits_casestudy[8,i] <- coef(f8)[[i]] }
+# for (i in 1:3){ fits_casestudy[9,i] <- coef(f9)[[i]] }
+for (i in 1:3){ fits_casestudy[10,i] <- coef(f10)[[i]] }
+
+fits_casestudy$nl_wmax[which(fits_casestudy$nl_wmax == 0)] <- NA
+fits_casestudy$nl_s[which(fits_casestudy$nl_s == 0)] <- NA
+fits_casestudy$nl_nc[which(fits_casestudy$nl_nc == 0)] <- NA
+```
+
+```{r}
+fits_casestudy %>% 
+  ggplot(aes(nl_wmax, nl_nc))+
+  geom_point()
+```
+
+```{r}
+finalfit <- nls(nl_nc~ A1*nl_wmax^(-A2),
+    data = fits_casestudy,
+    start = list(A1 = 3.5, A2 = .4))
+coef(finalfit)
+confint(finalfit)
+```
+
+```{r}
+hist(fits_casestudy$nl_wmax)
+```
+
+## Bayes  
+
+```{r}
+rice_model <- "
+model {
+for (i in 1:Q)
+{
+W[i]~dnorm(mu[i], tau_b)
+N[i]~dnorm(Nc[Date[i]], tau_n)
+mu[i]<-min(Bmax[Date[i]], Bmax[Date[i]]+S[Date[i]]*(N[i]-Nc[Date[i]]))
+}
+for (j in 1:K)
+{
+Nc[j]=A1*Bmax[j]^(-A2)
+Bmax[j]~dnorm(Mu_Bmax,Prec_Bmax)T(0,)
+S[j]~dnorm(Mu_S,Prec_S)T(0,)
+}
+
+Mu_Bmax~dnorm(10,0.1)
+Mu_S~dnorm(0,0.1)
+A1~dunif(2,6)
+A2~dunif(0,0.65)
+Prec_Bmax~dgamma(0.001,0.001)
+Prec_S~dgamma(0.001,0.001) 
+tau_b~dgamma(0.001,0.001)
+tau_n~dgamma(0.001,0.001)
+}
+"
+writeLines(rice_model, "rjags/modelstring_rice.txt")
+```
+
+```{r}
+library(rjags)
+library(coda)
+
+g <- g %>% filter(samp_id %in% save_sampid[-c(2, 6, 8, 9)]) %>% 
+  mutate(samp_id2 = samp_id %>% as.character() %>% as.factor() %>% as.numeric() )
+
+set.seed(567)
+model<-jags.model('rjags/modelstring_rice.txt',
+                  data=list('W' = g$W, 'N' = g$N, 'Date' = g$samp_id2,
+                            'Q' = nrow(g), 'K' = n_distinct(g$samp_id2)),
+                  n.chains=3, n.adapt=1000)
+
+update(model, n.iter=1000)
+
+samples_casestudy <- coda.samples(model, variable.names=c("A1","A2"), n.iter=100000, thin=10)
+samples_casestudy_plot <- coda.samples(model, variable.names=c("Bmax","S", "Nc"), n.iter=100000, thin=10)
+```
+
+```{r}
+samples_casestudy_rice <- samples_casestudy
+samples_casestudy_plot_rice <- samples_casestudy_plot
+
+```
+
+```{r}
+as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>% as.data.frame() %>%
+  summarise(A1_p025 = quantile(A1, probs = .025),
+            A1_p975 = quantile(A1, probs = .975),
+            A2_p025 = quantile(A2, probs = .025),
+            A2_p975 = quantile(A2, probs = .975))
+```
+
+```{r}
+bayesresults_casestudy <- as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>% colMeans()
+bayesresults_casestudy_plot <- as.matrix(samples_casestudy_plot[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy_plot[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy_plot[[3]])) %>% colMeans()
+
+bayesresults_casestudy_plot <- 
+  bayesresults_casestudy_plot %>%
+  as.data.frame() %>% 
+  rownames_to_column("par") %>% 
+  separate(par, c("par", "samp_id2")) %>% 
+  rename(est = ".") %>% 
+  pivot_wider(names_from = "par", values_from = "est") %>% 
+  mutate(samp_id2 = samp_id2 %>% as.numeric())
+
+bayesresults_casestudy_plot <- bayesresults_casestudy_plot %>%
+  rename(bayes_bmax = Bmax, bayes_s = S)
+
+bayesresults_casestudy_plot <- bayesresults_casestudy_plot %>% left_join(g %>% dplyr::select(samp_id, samp_id2) %>% unique())
+```
+
+
+
+```{r}
+f_rice <- f
+g_rice <- g
+finalfit_rice <- finalfit
+samples_casestudy_rice <- samples_casestudy
+samples_casestudy_plot_rice <- samples_casestudy_plot
+bayesresults_casestudy_rice <- bayesresults_casestudy
+bayesresults_casestudy_plot_rice <- bayesresults_casestudy_plot
+fits_casestudy_rice <- fits_casestudy
+confint(finalfit_rice)
+```
+
+```{r}
+box1a_rice <- as.matrix(samples_casestudy[[1]]) %>% 
+  rbind(as.matrix(samples_casestudy[[2]])) %>% 
+  rbind(as.matrix(samples_casestudy[[3]])) %>%
+  as.data.frame() %>% 
+  mutate(iter = 1:30000) %>% 
+  pivot_longer(cols = -iter) %>% 
+  ggplot(aes(value))+
+  geom_histogram(fill = wesanderson::wes_palette("Darjeeling1")[1], alpha =.45)+
+  facet_wrap(~name, scales = 'free')+
+  theme_pubclean()+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  geom_errorbarh(aes(xmin = ifelse(name == "A1", confint(finalfit)[[1]], confint(finalfit)[[2]]),
+                     xmax = ifelse(name == "A1", confint(finalfit)[[3]], confint(finalfit)[[4]]), y = 0),
+                 color = wesanderson::wes_palette("Darjeeling1")[2],
+                 alpha =.75)+
+  geom_point(aes(x = ifelse(name == "A1", coef(finalfit)[[1]], coef(finalfit)[[2]]), y = 0),
+             color = wesanderson::wes_palette("Darjeeling1")[2],
+             alpha =.75)+
+  theme(aspect.ratio = 1)+
+  scale_x_continuous(breaks= scales::pretty_breaks(n=5))
+# ggsave("output/figures/rice_box1a.tiff", width = 6, height = 3.5)
+```
+
+
+```{r}
+curve.plot_rice <- g %>%  
+  left_join(fits_casestudy) %>% 
+  left_join(bayesresults_casestudy_plot %>% rename(bayes_nc = Nc)) %>% 
+  mutate(filter = ifelse(is.na(nl_wmax), "removed", "included")) %>% 
+  group_by(samp_id) %>% 
+  mutate(Nstart = min(N), Nend = max(N), Wstart = min(W)) %>% 
+  ungroup() %>% 
+  filter(filter == "included") %>% 
+  mutate(method = c(rep(c("Sequential framework", "Hierarchical framework"), each = 30))) %>% 
+  ggplot(aes(W, N))+
+  geom_point(aes(fill = method, color = method), shape =21)+
+  geom_point(color = "grey15", show.legend = FALSE)+
+  stat_function(fun = function(x){coef(finalfit)[[1]] * x ^(-coef(finalfit)[[2]])}, linetype =2, color = wesanderson::wes_palette("Darjeeling1")[2])+
+  stat_function(fun = function(x){bayesresults_casestudy[[1]] * x ^(- bayesresults_casestudy[[2]])}, color = wesanderson::wes_palette("Darjeeling1")[1])+
+  geom_segment(aes(y = Nstart , yend = nl_nc, x = nl_wmax + nl_s*(Nstart-nl_nc), xend = nl_wmax, group = factor(samp_id)),
+               show.legend = FALSE, color = wesanderson::wes_palette("Darjeeling1")[2],
+               linetype = 2, alpha = .6)+
+  geom_segment(aes(y = nl_nc, yend = nl_nc+1, show.legend = FALSE, x = nl_wmax, xend = nl_wmax),color = wesanderson::wes_palette("Darjeeling1")[2],
+               linetype = 2, alpha = .6)+
+  
+  geom_segment(aes(y = Nstart , yend = bayesresults_casestudy[[1]] * bayes_bmax ^(- bayesresults_casestudy[[2]]), 
+                   x = bayes_bmax + bayes_s*(Nstart-(bayesresults_casestudy[[1]] * bayes_bmax ^(- bayesresults_casestudy[[2]]))), xend = bayes_bmax, 
+                   group = factor(samp_id)), 
+               color = wesanderson::wes_palette("Darjeeling1")[1], show.legend = FALSE, linetype = 1, alpha = .4)+
+  geom_segment(aes(y = bayesresults_casestudy[[1]] * bayes_bmax ^(- bayesresults_casestudy[[2]]), yend = bayesresults_casestudy[[1]] * bayes_bmax ^(- bayesresults_casestudy[[2]])+1,
+                   show.legend = FALSE, x = bayes_bmax, xend = bayes_bmax),color =wesanderson::wes_palette("Darjeeling1")[1],  linetype = 1, alpha = .4)+
+  theme_pubclean()+
+  theme(aspect.ratio = .68)+
+  coord_cartesian(xlim = c(1, 25), ylim = c(0.5, 4.5), expand = F)+
+  labs(fill = "", color = "")+
+  scale_fill_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"));curve.plot_rice
+
+# ggsave("output/figures/box1b_rice_casestudy.tiff", width = 6, height = 3.5)
+```
+
+### N recomm sensitivity  
+
+```{r}
+
+g %>%  
+  left_join(fits_casestudy) %>% 
+  left_join(bayesresults_casestudy_plot) %>%
+  mutate(filter = ifelse(is.na(nl_wmax), "removed", "included")) %>% 
+  filter(filter == "included") 
+diff.plot_rice <- data.frame(W = seq(from = 1.5, to = 10, length.out = 100)) %>% 
+  mutate(Nc_Sequential = coef(finalfit)[[1]] * W ^(-coef(finalfit)[[2]]),
+         Nc_Hierarchical = bayesresults_casestudy[[1]] * (W^(- bayesresults_casestudy[[2]])),
+         NNI_Sequential = 1/Nc_Sequential,
+         NNI_Hierarchical = 1/Nc_Hierarchical) %>% 
+  dplyr::select(W, Nc_Sequential:NNI_Hierarchical) %>% 
+  pivot_longer(cols = c(Nc_Sequential, Nc_Hierarchical, NNI_Sequential, NNI_Hierarchical)) %>% 
+  separate(name, c("trait", "framework")) %>% 
+  pivot_wider(names_from = "framework", values_from = "value") %>%
+  mutate(y = ifelse(trait == "Nc", (Sequential-Hierarchical)*.01*(W*1000), Sequential-Hierarchical)) %>% 
+  filter(trait == "Nc") %>%
+  ggplot(aes(W, y))+
+  geom_ribbon(aes(ymin = 0, ymax = y),
+              data = . %>% filter(y>0), fill = wesanderson::wes_palette("Darjeeling1")[2], alpha=.3)+
+  # geom_ribbon(aes(ymin = y, ymax = 0),
+              # data = . %>% filter(y<=0), fill = wesanderson::wes_palette("Darjeeling1")[2], alpha=.3)+
+  # geom_text(label = "N fertilizer \n recommendation \n sequential > hierarchical", x = 1.6, y = 6.1, hjust = 0)+
+  # geom_text(label = "N fertilizer \n recommendation \n sequential < hierarchical", x = 4, y = -15, hjust = 0)+
+  geom_line()+
+  labs(x = expression(Biomass~(Mg~ha^{-1})), 
+       y = expression(Difference~`in`~N~requirements~(kg~ha^-1)))+
+  theme_pubclean()+
+  theme(aspect.ratio = 1)+
+  labs(fill = "Method", color = "Method")+
+  scale_fill_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"))
+diff.plot_rice
+
+# ggsave("output/figures/applied_casestudy_rice.tiff", width = 6, height = 4)
+
+```
+
+
+```{r}
+fig2 <- ggarrange(ggarrange(box1b_rice+theme(legend.position = "none"),
+                  box1a_wheat+theme(legend.position = "none")+
+                    theme(strip.background = element_rect(fill = NA, color = NA),
+                          strip.text = element_text(face = "bold"),
+                          axis.title.y = element_blank())+
+                    scale_x_continuous(breaks = scales::breaks_extended(4))+  
+                    scale_color_manual(values = wesanderson::wes_palette("Darjeeling1")),
+          labels = c("A", "B"),
+          ncol =1,
+          heights = c(1.5,1),
+          align = "hv"),
+          fig2c_rice,
+          ncol = 2,
+          common.legend = TRUE,
+          labels = c(NA, "C"))
+
+ggsave("output/figures/fig2_rice_07032022.tiff", fig2, width = 7.75, height = 3.5)
+```
+
+

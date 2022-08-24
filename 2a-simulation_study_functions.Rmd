@@ -1,0 +1,323 @@
+---
+title: "2a-simulation_study_functions"
+author: "J Lacasa"
+date: "8/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+This is a step-by-step tutorial to perform the simulation study and analyze the results.  
+
+## 1. Preparation
+
+### Load the packages needed:  
+
+```{r libs, message=FALSE, warning=FALSE}
+library(tidyverse) # data wrangling
+library(mosaic) # bootstrap
+library(ggpubr) # prepare figures for publication
+
+# For the Bayesian analysis:  
+library(rjags)
+library(coda)
+```
+### 1.1. Functions for data simulation  
+
+#### Linear plateau  
+```{r linear plateau}
+# Linear Plateau
+linear_plateau <- function(x, Nc, bmax, slope) {
+  y <- ifelse(x >= Nc, bmax, 
+              bmax - (slope*(Nc - x)))
+  return(y)
+}
+```
+
+#### General dilution function  
+
+```{r general dilution}
+# Dilution
+get_nc <- function(A1, A2, bmax) {
+  Nc <- A1 * bmax^(-A2)
+}
+```
+
+#### Dilution curve simulation  
+```{r dilution simulation}
+dilution <- function(A1, A2, # true dilution parameters [scalars] 
+                     N_nrates, N_reps, # nr. of nrates of the experiment [scalars]
+                     Bmax_v, s_v, # parameters of the linear-plateau function [vectors]
+                     Nstart_v, # points of minimum observed N% [vector]
+                     sy_v, # samplings [vector]
+                     var, # is there variability in the maximum N%? [logical] 1,2,3 are F; rest is T
+                     Nact_ul) {
+  
+  N_samplings <- length(Bmax_v) # (from above) vector length = nr of samplings
+  
+  x <- list(rep(NA,N_samplings))
+  for (i in 1:N_samplings) {
+    s_star <- s_v[i]
+    Bmax <- Bmax_v[i]
+    Nstart <- Nstart_v[i]
+    
+    Nc <- get_nc(A1 = A1, bmax = Bmax, A2 = A2)
+    
+    Nact <- seq(from = Nstart, to = rnorm(1, as.numeric(Nc)+ Nact_ul, ifelse(var == TRUE, sqrt(.05*Nc), 0)), length.out = N_nrates) ## upper limit randomly assigns experiments that don't reach plateau
+    
+    What <- linear_plateau(x = Nact, Nc = Nc, bmax = Bmax, slope = s_star)
+    
+    Wobs <- rep(What, each = N_reps) + rnorm(N_reps * length(What), mean = 0, sd = sqrt(.08))
+    
+    x[[i]] <- data.frame(sy = sy_v[i],
+                         Nc = Nc,
+                         Nact = rep(Nact, each = N_reps),
+                         Wmax = Bmax,
+                         What = rep(What, each = N_reps) ,
+                         W = Wobs,
+                         s=s_star,
+                         sampling = i,
+                         nrate = rep(1:N_nrates, each = N_reps),
+                         
+                         Nend = Nact[N_nrates],
+                         Nstart = Nstart,
+                         Wstart = What[1],
+                         Wend = Bmax) # What[N_nrates])
+  }
+  
+  x2 <- x %>% bind_rows()
+  return(x2)
+}
+```
+
+#### Nc plots  
+```{r nc plots}
+nc_plots <- function(dataframe){
+  dataframe %>% 
+  ggplot(aes(W, Nact))+
+  geom_segment(aes(y = Nstart, yend = Nc, x = Wstart, xend = Wend, group = sampling),
+               linetype = 2, alpha = .7, color = "grey35")+
+  geom_segment(aes(y = Nc, yend = Nend, x = Wend, xend = Wend), linetype = 2, alpha = .7, color = "grey35")+
+  geom_point(aes(color = sy), show.legend = FALSE)+
+  geom_line(aes(x = Wmax, y = Nc))
+}
+```
+
+### 1.2. Functions for model fitting  
+#### Linear plateau
+```{r map linear pl}
+skip_to_next <- TRUE
+
+map_lp <- function(dataframe){
+  a <- list()
+  a[[n_distinct(dataframe$sampling)+1]] <- 1
+  for (i in 1:n_distinct(dataframe$sampling)) {
+  
+  tryCatch({
+    a[[i]] <- nls(W ~ ifelse(Nact>Nc,
+                   Bmax,
+                   Bmax - ((Nc - Nact)*s)),
+        data = dataframe %>% filter(sampling == i),
+        start = list(Bmax = unique(dataframe$Wmax[which(dataframe$sampling==i)]), 
+                     s = unique(dataframe$s[which(dataframe$sampling==i)]),
+                     Nc = unique(dataframe$Nc[which(dataframe$sampling==i)])))
+    },
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+    
+  if(skip_to_next) { next }     
+  }
+  return(a[-(n_distinct(dataframe$sampling)+1)])
+  }
+```
+
+#### Spot all samplings that did not fit a LP model  
+```{r Spot all non - LP samplings}
+spot_nulls <- function(list_nls) {
+  v <- logical(length(list_nls))
+  for (i in 1:length(list_nls)){
+  v[i] <- is.null(list_nls[[i]])
+  }
+  return(v)
+}
+```
+
+#### Get AIC  
+```{r get aic}
+get_aic <- function(list_nls) {
+  v <- numeric(length(list_nls))
+  for (i in 1:length(list_nls)){
+  
+  tryCatch({
+    v[i] <- AIC(list_nls[[i]])
+    },
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+    if(skip_to_next) { next }
+    
+  }
+  return(v)
+}
+```
+
+#### Retrieve Nc estimates
+```{r get nc}
+get_nc_fromlist <- function(list_nls) {
+  v <- numeric(length(list_nls))
+  for (i in 1:length(list_nls)){
+  
+  tryCatch({
+    v[i] <- coef(list_nls[[i]])[3]
+    },
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+    if(skip_to_next) { next }
+    
+  }
+  return(v)
+}
+```
+
+#### Retrieve Wmax estimates
+```{r get wmax}
+get_wmax_fromlist <- function(list_nls) {
+  v <- numeric(length(list_nls))
+  for (i in 1:length(list_nls)){
+  
+  tryCatch({
+    v[i] <- coef(list_nls[[i]])[1]
+    },
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+    if(skip_to_next) { next }
+    
+  }
+  return(v)
+}
+```
+
+
+#### Compare AIC values  
+
+```{r compare aic}
+compare_aic <- function(dataframe, nl_list) {
+  dataframe %>% 
+  group_by(sy) %>% 
+  nest() %>% 
+  mutate(lm_aic = data %>% map_dbl(~AIC(lm(W~Nact, data = .)))) %>% 
+  ungroup() %>% 
+  mutate(nl_aic = get_aic(nl_list),
+         recomm = ifelse(nl_aic == 0 , "lm", 
+                         ifelse(lm_aic<nl_aic, "lm", "nl")))
+  }
+```
+
+#### Check nr of missing plateaus of final list  
+
+```{r}
+find_missing <- function(plateaus_df, N_simul) {
+  missing <- data.frame(
+    sim1 = numeric(N_simul),
+    sim2 = numeric(N_simul),
+    sim3 = numeric(N_simul),
+    sim4 = numeric(N_simul),
+    sim5 = numeric(N_simul),
+    sim6 = numeric(N_simul),
+    sim7 = numeric(N_simul),
+    sim8 = numeric(N_simul),
+    sim9 = numeric(N_simul))
+
+for (i in 1:N_simul) {
+  tryCatch({
+    missing[i, 1] <- mean(plateaus[[i]][[1]])
+    missing[i, 2] <- mean(plateaus[[i]][[2]])
+    missing[i, 3] <- mean(plateaus[[i]][[3]])
+    missing[i, 4] <- mean(plateaus[[i]][[4]])
+    missing[i, 5] <- mean(plateaus[[i]][[5]])
+    missing[i, 6] <- mean(plateaus[[i]][[6]])
+    missing[i, 7] <- mean(plateaus[[i]][[7]])
+    missing[i, 8] <- mean(plateaus[[i]][[8]])
+    missing[i, 9] <- mean(plateaus[[i]][[9]])},
+    error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+  if(skip_to_next) { next }
+}
+  return(missing)
+
+}
+```
+
+#### Get results  
+
+```{r}
+get_results_df <- function(coefs_a1, coefs_a2) {
+  results <- data.frame(A1_sim1 = numeric(100),
+                      A1_sim2 = numeric(100),
+                      A1_sim3 = numeric(100),
+                      A1_sim4 = numeric(100),
+                      A1_sim5 = numeric(100),
+                      A1_sim6 = numeric(100),
+                      A1_sim7 = numeric(100),
+                      A1_sim8 = numeric(100),
+                      A1_sim9 = numeric(100),
+                      A2_sim1 = numeric(100),
+                      A2_sim2 = numeric(100),
+                      A2_sim3 = numeric(100),
+                      A2_sim4 = numeric(100),
+                      A2_sim5 = numeric(100),
+                      A2_sim6 = numeric(100),
+                      A2_sim7 = numeric(100),
+                      A2_sim8 = numeric(100),
+                      A2_sim9 = numeric(100) )
+  
+  for (i in 1:100) {
+    tryCatch({
+      for (k in 1:9) {
+        tryCatch({
+          results[i, k] <- coefs_a1[[i]][[k]]
+          results[i, k+9] <- coefs_a2[[i]][[k]]},
+          error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+        }
+      },
+      error = function(e) {cat("ERROR :",conditionMessage(e), "\n")})
+    if(skip_to_next) { next }
+  }
+  
+  return(results)
+  }
+```
+
+### 1.3. Possible values for the parameters  
+From previously fitted models:  
+
+```{r possible values}
+Bmax_v  <- c(12.094524, 2.361051, 21.296833, 1.698687, 5.748407, 11.286020, 17.220997,
+             10.759228, 3.246197, 5.187880, 6.591169, 17.945879, 4.051885, 3.438621, 
+             7.753593, 7.688300, 17.535264, 13.470911, 8.207903, 13.908301, 11.252741, 
+             18.149904, 6.992624, 5.497277, 4.157624)
+s_v <- c(8.874063, 7.705234, 23.434591, 5.655173, 2.374744, 4.378211, 8.790163, 6.846135,
+         7.247695, 8.227871, 10.338659, 3.492825, 2.396942, 3.725000, 5.050988, 6.460981, 
+         12.681507, 7.610896, 7.405020, 4.284201, 8.907889, 16.601601, 5.119101, 2.979447, 6.839036)
+
+Nstart_v <- c(1.4049587, 2.6131135, 0.6837088, 2.8280250, 0.9700000, 0.6900000, 0.9449064,
+              1.0484540, 2.2313586, 1.5800000, 1.4300000, 0.5800000, 1.1900000, 2.0439873,
+              1.1801569, 1.2000000, 0.7431479, 0.5893971, 1.4713380, 0.7090465, 1.4297269, 
+              0.5723173, 1.1162980, 1.3600000, 1.6500000)
+```
+
+
+#### Check if N observation start after Nc   
+(starting too close to the critical value will make it very hard to detect the plateau - not good for when you want 0% missing plateaus).  
+```{r check n start}
+data.frame(s_v, Nstart_v, Bmax_v) %>% 
+  mutate(nc = get_nc(A1 = 3.5, bmax = Bmax_v, A2 = .35)) %>%
+  ggplot(aes(nc, Nstart_v))+
+  geom_point()+
+  geom_abline(slope = 1)
+```
+
+```{r}
+remove1 <- data.frame(s_v, Nstart_v, Bmax_v) %>% 
+  rownames_to_column("n") %>% 
+  mutate(nc = get_nc(A1 = 3.5, bmax = Bmax_v, A2 = .35), 
+         n = as.numeric(n)) %>%
+  filter((Nstart_v/nc)>.88) %>% pull(n)
+```
