@@ -1,0 +1,12 @@
+---
+title: "2c-simulation_study_results&figures"
+author: "J Lacasa"
+date: "8/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
