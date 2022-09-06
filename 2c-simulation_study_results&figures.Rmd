@@ -9,4 +9,443 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Figure 1 components  
+
+```{r}
+fig1_0 <- sim2[[77]] %>% 
+  ggplot(aes(W, Nact))+
+  theme_pubclean()+
+  geom_point(aes(), shape = 21, color = NA)+
+  coord_cartesian(ylim =c(0.4, 2.85), xlim = c(1.5, 24))+
+  theme(aspect.ratio = .45, axis.title = element_text(size = 14))+
+  stat_function(fun = function(x) { A1.true *x ^(-A2.true)})+
+  labs(y = "%N", x = expression(W~(Mg~ha^{-1})));fig1_0 
+ggsave("../output/figures/fig10_07062022.tiff", fig1_0, width = 5, height = 2.1)
+
+```
+
+```{r}
+fig1_a <- sim2[[77]] %>% filter(!sampling %in% c(2, 4, 6)) %>% 
+  ggplot(aes(W, Nact))+
+  geom_vline(aes(xintercept= Wmax), linetype = 2, color = "grey45")+
+  theme_pubclean()+
+  geom_point(aes(), shape = 21, color = NA)+
+  coord_cartesian(ylim =c(0.4, 2.85), xlim = c(1.5, 24))+
+  theme(aspect.ratio = .45, axis.title = element_text(size = 14))+
+  labs(y = "%N", x = expression(W~(Mg~ha^{-1})));fig1_a 
+ggsave("../output/figures/fig1a_07062022.tiff", fig1_a, width = 5, height = 2.1)
+
+```
+
+```{r}
+fig1_b <- sim2[[77]] %>%filter(!sampling %in% c(2, 4, 6)) %>% 
+  ggplot(aes(W, Nact))+
+  geom_vline(aes(xintercept= Wmax), linetype = 2, color = "grey45")+
+  geom_point(aes(Wmax, Nc))+
+  theme_pubclean()+
+  coord_cartesian(ylim =c(0.4, 2.85), xlim = c(1.5, 24))+
+  theme(aspect.ratio = .45, axis.title = element_text(size = 14))+
+  labs(y = "%N", x = expression(W~(Mg~ha^{-1})));fig1_b
+ggsave("../output/figures/fig1b_07062022.tiff", fig1_b, width = 5, height = 2.1)
+
+```
+
+
+```{r}
+fig1_b2 <- sim2[[77]] %>% filter(!sampling %in% c(2, 4, 6)) %>% 
+  ggplot(aes(W, Nact))+
+  geom_vline(aes(xintercept= Wmax), linetype = 2, color = "grey45")+
+  geom_segment(aes(x = Wmax, xend =Wmax, y = Nc, yend = 2.85))+
+  geom_segment(aes(x = 1.5, xend =Wmax, y = (-((1.5-Wmax)/s) - Nc)*(-1) , yend = Nc))+
+  geom_point(aes(Wmax, Nc))+
+  theme_pubclean()+
+  coord_cartesian(ylim =c(0.4, 2.85), xlim = c(1.5, 24))+
+  theme(aspect.ratio = .45, axis.title = element_text(size = 14))+
+  labs(y = "%N", x = expression(W~(Mg~ha^{-1})));fig1_b2
+ggsave("../output/figures/fig1b2_07062022.tiff", fig1_b2, width = 5, height = 2.1)
+
+```
+
+
+```{r}
+fig1_c <- sim2[[77]] %>% filter(!sampling %in% c(2, 4, 6)) %>% 
+  group_by(sampling) %>% mutate(min_Nact = min(Nact), max_Nact = max(Nact),
+                                min_w = min(What), max_w = max(What)) %>% 
+  ungroup() %>% 
+  ggplot(aes(W, Nact))+
+  geom_vline(aes(xintercept= Wmax), linetype = 2, color = "grey45")+
+  geom_segment(aes(x = Wmax, xend =Wmax, y = Nc, yend = 2.85))+
+  geom_segment(aes(x = 1.5, xend =Wmax, y = (-((1.5-Wmax)/s) - Nc)*(-1) , yend = Nc))+
+  geom_point(aes(Wmax, Nc))+
+  geom_point(size=1.75, aes(What, Nact), color ='black', fill = "gold", shape =22)+
+  theme_pubclean()+
+  coord_cartesian(ylim =c(0.4, 2.85), xlim = c(1.5, 24))+
+  theme(aspect.ratio = .45, axis.title = element_text(size = 14))+
+  labs(y = "%N", x = expression(W~(Mg~ha^{-1})));fig1_c
+ggsave("../output/figures/fig1c_07062022.tiff", fig1_c, width = 5, height = 2.1)
+
+```
+
+```{r}
+fig1_d <- sim2[[77]] %>% filter(!sampling %in% c(2, 4, 6)) %>% 
+  ggplot(aes(W, Nact))+
+  geom_vline(aes(xintercept= Wmax), linetype = 2, color = "grey45")+
+  geom_segment(aes(x = Wmax, xend =Wmax, y = Nc, yend = 2.85))+
+  geom_segment(aes(x = 1.5, xend =Wmax, y = (-((1.5-Wmax)/s) - Nc)*(-1) , yend = Nc))+
+  geom_segment(aes(x = What - .4, xend = What, y = Nact, yend = Nact), color ='tomato')+
+  geom_point(aes(W, Nact), color = "grey40")+
+  theme_pubclean()+
+  coord_cartesian(ylim =c(0.4, 2.85), xlim = c(1.5, 24))+
+  theme(aspect.ratio = .45, axis.title = element_text(size = 14))+
+  labs(y = "%N", x = expression(W~(Mg~ha^{-1})));fig1_d
+ggsave("../output/figures/fig1d_07062022.tiff", fig1_d, width = 5, height = 2.1)
+
+```
+
+## Figure 2  
+
+
+```{r}
+bayes_maize <- 
+  as.matrix(samples_casestudy_maize) %>% 
+  as.data.frame() %>% 
+  summarise(A1_025 = quantile(A1, probs = .025),
+            A1_975 = quantile(A1, probs = .975),
+            A2_025 = quantile(A2, probs = .025),
+            A2_975 = quantile(A2, probs = .975)) %>% 
+  as.vector()
+
+bayes_rice <- 
+  as.matrix(samples_casestudy_rice) %>% 
+  as.data.frame() %>% 
+  summarise(A1_025 = quantile(A1, probs = .025),
+            A1_975 = quantile(A1, probs = .975),
+            A2_025 = quantile(A2, probs = .025),
+            A2_975 = quantile(A2, probs = .975)) %>% 
+  as.vector()
+
+```
+
+```{r}
+fig2d <- data.frame(species = c("Maize", "Rice"),
+           method = rep(c("Sequential", "Hierarchical"), each = 2),
+           A1_mean = c(coef(finalfit_maize)[[1]],
+                       coef(finalfit_rice)[[1]],
+                       bayesresults_casestudy_maize[[1]],
+                       bayesresults_casestudy_rice[[1]] ),
+           A2_mean = c(coef(finalfit_maize)[[2]],
+                       coef(finalfit_rice)[[2]],
+                       bayesresults_casestudy_maize[[2]],
+                       bayesresults_casestudy_rice[[2]]),
+           A1_lb = c( confint(finalfit_maize)[1,1],
+                       confint(finalfit_rice)[1,1],
+                       bayes_maize[[1]],
+                       bayes_rice[[1]] ),
+           A2_lb = c(confint(finalfit_maize)[2,1],
+                      confint(finalfit_rice)[2,1],
+                      bayes_maize[[3]],
+                      bayes_rice[[3]]),
+           A1_ub = c(
+             confint(finalfit_maize)[1,2],
+             confint(finalfit_rice)[1,2],
+             bayes_maize[[2]],
+             bayes_rice[[2]] ),
+           A2_ub = c(
+             confint(finalfit_maize)[2,2],
+             confint(finalfit_rice)[2,2],
+             bayes_maize[[4]],
+             bayes_rice[[4]])) %>% 
+  pivot_longer(cols = -c(species, method)) %>% 
+  separate(name, c("parameter", "extreme")) %>% 
+  pivot_wider(names_from = "extreme", values_from = "value") %>%
+  mutate(species = factor(species, levels = c("Maize", "Rice"))) %>% 
+  ggplot(aes(species, mean, color = method))+
+  geom_errorbar(aes(ymin = lb, ymax = ub), width = 0, position = position_dodge(.3))+
+  geom_point(position = position_dodge(.3))+
+  facet_wrap(~parameter, scales = 'free_x')+
+  coord_flip()+
+  theme_pubclean()+
+  # theme_classic()+
+  theme(aspect.ratio = 1.8,
+        axis.title.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(color = "grey", linetype = 3),
+        strip.background = element_blank(),
+        axis.title.x = element_blank())+
+  labs()+
+  scale_color_manual(values = c("#E69F00", "#56B4E9"));fig2d
+```
+
+```{r}
+plot_legend <- data.frame(species = c("Maize", "Rice"),
+           method = rep(c("Sequential", "Hierarchical"), each = 2),
+           A1_mean = c(coef(finalfit_maize)[[1]],
+                       coef(finalfit_rice)[[1]],
+                       bayesresults_casestudy_maize[[1]],
+                       bayesresults_casestudy_rice[[1]] ),
+           A2_mean = c(coef(finalfit_maize)[[2]],
+                       coef(finalfit_rice)[[2]],
+                       bayesresults_casestudy_maize[[2]],
+                       bayesresults_casestudy_rice[[2]]),
+           A1_lb = c( confint(finalfit_maize)[1,1],
+                       confint(finalfit_rice)[1,1],
+                       bayes_maize[[1]],
+                       bayes_rice[[1]] ),
+           A2_lb = c(confint(finalfit_maize)[2,1],
+                      confint(finalfit_rice)[2,1],
+                      bayes_maize[[3]],
+                      bayes_rice[[3]]),
+           A1_ub = c(
+             confint(finalfit_maize)[1,2],
+             confint(finalfit_rice)[1,2],
+             bayes_maize[[2]],
+             bayes_rice[[2]] ),
+           A2_ub = c(
+             confint(finalfit_maize)[2,2],
+             confint(finalfit_rice)[2,2],
+             bayes_maize[[4]],
+             bayes_rice[[4]])) %>% 
+  pivot_longer(cols = -c(species, method)) %>% 
+  separate(name, c("parameter", "extreme")) %>% 
+  pivot_wider(names_from = "extreme", values_from = "value") %>%
+  mutate(species = factor(species, levels = c("Maize", "Rice"))) %>% 
+  ggplot(aes(species, mean, color = method))+
+  geom_errorbar(aes(ymin = lb, ymax = ub), width = 0, position = position_dodge(.3))+
+  geom_point(position = position_dodge(.3), shape=21, aes(fill = species), color = NA)+
+  scale_color_manual(values = c("#E69F00", "#56B4E9"))+
+  scale_fill_manual(values = c( "#009E73", "#D55E00"))
+```
+
+```{r}
+fig2 <- ggarrange(
+  fig2abc[[1]]+theme(legend.position = "none"),
+  fig2abc[[2]]+theme(legend.position = "none"),
+  fig2abc[[3]]+theme(legend.position = "bottom"),
+  fig2d+theme(legend.position = "right",
+              legend.title = element_blank())+  scale_y_continuous(breaks= scales::pretty_breaks(n=3)) ,
+  heights = c(1, 1),
+  labels = c("A", "B", "C", "D"),
+  legend = "bottom",
+  legend.grob = get_legend(plot_legend+theme(legend.box = "horizontal", 
+                                             legend.direction = "horizontal")+
+                             labs(fill = "Species", color = "Framework"))); fig4
+ggsave("../output/figures/fig2_07072022.tiff", fig2, width = 7, height = 6)
+
+```
+
+
+## Figure 3  
+
+```{r}
+data_fig3_maize <- g_maize %>%  
+  left_join(fits_casestudy_maize) %>% 
+  left_join(bayesresults_casestudy_plot_maize %>% mutate(bayes_nc = Nc) %>% dplyr::select(-Nc)) %>% 
+  mutate(filter = ifelse(is.na(nl_wmax), "removed", "included")) %>% 
+  group_by(samp_id) %>% 
+  mutate(Nstart = min(N), Nend = max(N), Wstart = min(W)) %>% 
+  ungroup() %>% 
+  filter(filter == "included") %>% 
+  mutate(method = c(rep(c("Sequential framework", "Hierarchical framework"), each = 34), "Hierarchical framework")) 
+
+fig3_maize <-
+  data_fig3_maize %>% 
+  ggplot(aes(W, N))+
+  geom_point(aes(fill = method, color = method), shape =21)+
+  geom_point(color = "grey15", show.legend = FALSE)+
+  geom_segment(aes(y = Nstart , yend = nl_nc, x = nl_wmax + nl_s*(Nstart-nl_nc), xend = nl_wmax, group = factor(samp_id)),
+               show.legend = FALSE, color = "#56B4E9", linetype = 2, alpha = 1)+
+  geom_segment(aes(y = nl_nc, yend = nl_nc+1, show.legend = FALSE, x = nl_wmax, xend = nl_wmax),color = "#56B4E9",
+               linetype = 2, alpha = 1)+
+  geom_segment(aes(y = Nstart , yend = bayes_nc, 
+                   x = bayes_bmax + bayes_s*(Nstart-bayes_nc), xend = bayes_bmax, 
+                   group = factor(samp_id)), 
+               color = "#E69F00", show.legend = FALSE, linetype = 1, alpha = 1)+
+  geom_segment(aes(y = bayes_nc,
+                   yend = bayes_nc+1,
+                   show.legend = FALSE, x = bayes_bmax, xend = bayes_bmax),color ="#E69F00",  linetype = 1, alpha = 1)+
+  stat_function(fun = function(x){coef(finalfit)[[1]] * x ^(-coef(finalfit)[[2]])}, linetype =2, color = "#56B4E9", alpha =1, size =1.5)+
+  stat_function(fun = function(x){bayesresults_casestudy[[1]] * x ^(- bayesresults_casestudy[[2]])}, color = "#E69F00", size = 1.5)+
+  theme_pubclean()+
+  theme(aspect.ratio = 1.8, legend.title = element_blank())+
+  coord_cartesian(xlim = c(1, 9.6), ylim = c(0.5, 4.5), expand = F)+
+  labs(fill = "", color = "", 
+       y = expression(italic("%"~N)),
+       x= expression(Mg~ha^{-1}))+
+  scale_fill_manual(values = c("#E69F00", "#56B4E9"))+
+  scale_color_manual(values = c("#E69F00", "#56B4E9")); fig3_maize
+```
+
+
+
+```{r}
+data_fig3_rice <- g %>%  
+  left_join(fits_casestudy) %>% 
+  left_join(bayesresults_casestudy_plot_rice %>% rename(bayes_nc = Nc)) %>% 
+  mutate(filter = ifelse(is.na(nl_wmax), "removed", "included")) %>% 
+  group_by(samp_id) %>% 
+  mutate(Nstart = min(N), Nend = max(N), Wstart = min(W)) %>% 
+  ungroup() %>% 
+  filter(filter == "included") %>% 
+  mutate(method = c(rep(c("Sequential framework", "Hierarchical framework"), each = 30))) 
+
+
+fig3_rice <- 
+  data_fig3 %>% 
+  ggplot(aes(W, N))+
+  geom_point(aes(fill = method, color = method), shape =21)+
+  geom_point(color = "grey15", show.legend = FALSE)+
+  geom_segment(aes(y = Nstart , yend = nl_nc, x = nl_wmax + nl_s*(Nstart-nl_nc), xend = nl_wmax, group = factor(samp_id)),
+               show.legend = FALSE, color = "#56B4E9",
+               linetype = 2, alpha = 1)+
+  geom_segment(aes(y = nl_nc, yend = nl_nc+1, show.legend = FALSE, x = nl_wmax, xend = nl_wmax),color = "#56B4E9",
+               linetype = 2, alpha = 1)+
+  geom_segment(aes(y = Nstart , yend = bayes_nc, 
+                   x = bayes_bmax + bayes_s*(Nstart-bayes_nc), xend = bayes_bmax, 
+                   group = factor(samp_id)), 
+               color = "#E69F00", show.legend = FALSE, linetype = 1, alpha = 1)+
+  geom_segment(aes(y = bayes_nc,
+                   yend = bayes_nc+1,
+                   show.legend = FALSE, x = bayes_bmax, xend = bayes_bmax),color ="#E69F00",  linetype = 1, alpha = 1)+
+  stat_function(fun = function(x){coef(finalfit)[[1]] * x ^(-coef(finalfit)[[2]])}, linetype =2, color = "#56B4E9", alpha =1, size =1.5)+
+  stat_function(fun = function(x){bayesresults_casestudy_rice[[1]] * x ^(- bayesresults_casestudy_rice[[2]])}, color = "#E69F00", size = 1.5)+
+  theme_pubclean()+
+  theme(aspect.ratio = 1.8, legend.title = element_blank())+
+  coord_cartesian(xlim = c(1, 25), ylim = c(0.5, 4.5), expand = F)+
+  labs(fill = "", color = "", 
+       y = expression(italic("%"~N)),
+       x= expression(Mg~ha^{-1}))+
+  scale_fill_manual(values = c("#E69F00", "#56B4E9"))+
+  scale_color_manual(values = c("#E69F00", "#56B4E9"));fig3_rice
+```
+
+```{r}
+fig3 <- ggarrange(fig3_maize, fig3_rice,
+          ncol = 2,
+          labels = c("Maize",
+                     "Rice"),
+          common.legend = T,
+          label.x = c(.39, .43),
+          legend = "bottom");fig3
+ggsave("output/figures/fig3_07212022.tiff", fig3, width = 8, height = 6)
+
+```
+
+## Figure 4   
+```{r}
+data_diff.plot_maize <- data.frame(W = seq(from = 1.5, to = 10, length.out = 100)) %>% 
+  mutate(Nc_Sequential = coef(finalfit_maize)[[1]] * W ^(-coef(finalfit_maize)[[2]]),
+         Nc_Hierarchical = 3.1475285 * (W^(- 0.2531488)),
+         NNI_Sequential = 1/Nc_Sequential,
+         NNI_Hierarchical = 1/Nc_Hierarchical) %>% 
+  dplyr::select(W, Nc_Sequential:NNI_Hierarchical) %>% 
+  pivot_longer(cols = c(Nc_Sequential, Nc_Hierarchical, NNI_Sequential, NNI_Hierarchical)) %>% 
+  separate(name, c("trait", "framework")) %>% 
+  pivot_wider(names_from = "framework", values_from = "value") %>%
+  mutate(y = ifelse(trait == "Nc", (Sequential-Hierarchical)*.01*(W*1000), Sequential-Hierarchical)) %>% 
+  filter(trait == "Nc") 
+
+diff.plot_maize <- 
+  data_diff.plot_maize %>%
+  ggplot(aes(W, y))+
+  geom_ribbon(aes(ymin = 0, ymax = y),
+              data = . %>% filter(y>0), fill = "#54c0c5", alpha=.3)+
+  geom_ribbon(aes(ymin = y, ymax = 0),
+              data = . %>% filter(y<=0), fill = "#E69F00", alpha=.3)+
+  geom_line()+
+  labs(x = expression(italic(W)~(Mg~ha^{-1})))+
+  ylab(expression("Difference in N requirements \n(Sequential - Hierarchical; kg ha"^{-1}~")"))+
+  theme_pubclean()+
+  theme(aspect.ratio = 1.2)+
+  labs(fill = "Method", color = "Method")+
+  scale_fill_manual(values = wesanderson::wes_palette("Darjeeling1"))+
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1"));diff.plot_maize
+```
+
+
+```{r}
+data_diff.plot_rice <- data.frame(W = seq(from = 1.5, to = 10, length.out = 100)) %>% 
+  mutate(Nc_Sequential = coef(finalfit_rice)[[1]] * W ^(-coef(finalfit_rice)[[2]]),
+         Nc_Hierarchical = bayesresults_casestudy_rice[[1]] * (W^(- bayesresults_casestudy_rice[[2]])),
+         NNI_Sequential = 1/Nc_Sequential,
+         NNI_Hierarchical = 1/Nc_Hierarchical) %>% 
+  dplyr::select(W, Nc_Sequential:NNI_Hierarchical) %>% 
+  pivot_longer(cols = c(Nc_Sequential, Nc_Hierarchical, NNI_Sequential, NNI_Hierarchical)) %>% 
+  separate(name, c("trait", "framework")) %>% 
+  pivot_wider(names_from = "framework", values_from = "value") %>%
+  mutate(y = ifelse(trait == "Nc", (Sequential-Hierarchical)*.01*(W*1000), Sequential-Hierarchical)) %>% 
+  filter(trait == "Nc")
+
+diff.plot_rice <- 
+  data_diff.plot_rice %>%
+  ggplot(aes(W, y))+
+  geom_ribbon(aes(ymin = 0, ymax = y), data = . %>% filter(y>0), fill = "#54c0c5", alpha=.3)+
+  geom_line()+
+
+  labs(x = expression(italic(W)~(Mg~ha^{-1})), 
+       y = expression(Difference~`in`~N~requirements~"\n"~(kg~ha^-1)))+
+  theme_pubclean()+
+  theme(aspect.ratio = 1.2,
+        axis.title.y = element_blank())+
+  labs(fill = "Method", color = "Method")+
+  scale_fill_manual(values = "#54c0c5")+
+  scale_color_manual(values = "#54c0c5");diff.plot_rice
+```
+
+
+```{r}
+fig4 <- ggarrange(
+  diff.plot_maize+
+    labs(x = expression(italic(W)~(Mg~ha^{-1})),
+         y = expression(Delta~"%"~N[C]~(kg~ha^{-1}))),
+  diff.plot_rice+
+    labs(x = expression(italic(W)~(Mg~ha^{-1})),
+         y = expression(Delta~"%"~N[C]~(kg~ha^{-1}))),
+  labels = c("Maize", "Rice"),
+  label.x = .4);fig5
+ggsave("../output/figures/fig4_08042022.tiff", fig4, width = 6, height = 4.5)
+```
+
+## Figure 5  
+
+```{r}
+data_fig5 <- purrr::map_dfr(seq_len(10), ~ unique(final_compl)) %>% 
+  mutate(W = rep(seq(from = 1.5, to = 12, length.out =10), each = nrow(final_compl))) %>% 
+  filter(A1!=0 &A2 !=0) %>% 
+  mutate(Nc = A1 * W^(-A2)) %>% 
+  dplyr::select(-c(A1, A2)) %>%
+  pivot_wider(names_from = "method", values_from = "Nc") %>% 
+  mutate(N = case_when(sim_id %in% c(1, 4, 7)~ "N = 4", 
+                       sim_id %in% c(2, 5, 8)~ "N = 8", 
+                       sim_id %in% c(3, 6, 9)~ "N = 16") %>% 
+           factor(levels = c("N = 4", "N = 8", "N = 16"))) %>%
+  mutate(quality = case_when(sim_id %in% c(1, 2, 3)~ "High", 
+                       sim_id %in% c(4, 5, 6)~ "Medium", 
+                       sim_id %in% c(7, 8, 9)~ "Low") %>% 
+           factor(levels = c("Low", "Medium", "High"))) %>%
+  unite("group2", c("sim_id","Nrates"), remove = FALSE) %>% 
+  mutate(y = (`Sequential framework`-`Hierarchical framework`)*.001*W*1000,
+         Nrates = paste0(Nrates, " Nrates")) %>% 
+  group_by(sim_id, Nrates, W) %>% 
+  mutate(y_group = mean(y, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  filter(Nrates != "4 Nrates") %>% 
+  filter((quality == "High" & N %in% c("N = 4", "N = 16")) | (quality == "Low" & N %in% c("N = 4", "N = 16")))
+```
+
+
+```{r}
+data_fig5 %>% 
+  ggplot(aes(W, y))+
+  tidybayes::stat_lineribbon(aes(group = group2), alpha = .5)+
+  geom_hline(yintercept = 0, linetype =3, alpha = .6)+
+  facet_grid(quality~N+Nrates)+
+  labs(x = expression(Biomass~(Mg~ha^{-1})), 
+       color = "Amount of sampling dates")+
+  ylab(expression("Difference in %"~N[C]~"(Sequential - Hierarchical; kg ha"^{-1}~")"))+
+  theme_classic()+
+  theme(aspect.ratio = 1)+
+  scale_x_continuous(breaks = scales::breaks_extended(3))+
+  scale_fill_brewer()
+ggsave("../output/figures/fig5_08042022.tiff", width = 7, height = 4)
+```
 
